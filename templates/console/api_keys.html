@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}API Keys — {{ app_name }}{% endblock %}
+{% block topbar_title %}API Keys{% endblock %}
+{% block content %}
+<div class="page" x-data="keyManager()">
+  <div class="flex items-center justify-between mb-6"><div><h1 class="text-xl font-bold text-white">API Keys</h1><p class="text-sm mt-1" style="color:var(--muted)">Authenticate requests to the TextBase API</p></div><button @click="showCreate = true" class="btn-primary">New API Key</button></div>
+  <div class="card p-5 mb-6"><div class="font-semibold text-white mb-3">Authentication</div><div class="grid grid-cols-2 gap-4"><div><div class="text-xs font-semibold mb-2" style="color:var(--muted)">Native API</div><div class="code-block text-xs" style="color:#94a3b8"><span style="color:#818cf8">X-Api-Key:</span> sk_your_key_here</div></div><div><div class="text-xs font-semibold mb-2" style="color:var(--muted)">Twilio-compatible</div><div class="code-block text-xs" style="color:#94a3b8">Basic auth: <span style="color:#fbbf24">AccountSID:AuthToken</span></div></div></div></div>
+  <div class="card">{% if keys %}
+    <table class="data-table"><thead><tr><th>Name</th><th>Key</th><th>Status</th><th>Last Used</th><th>Created</th><th>Actions</th></tr></thead><tbody>
+    {% for k in keys %}<tr id="key-row-{{ k.id }}"><td class="font-semibold">{{ k.name }}</td><td><div class="flex items-center gap-2"><span class="font-mono text-xs" style="color:#818cf8">{{ k.key[:20] }}…</span>{% if k.status=='active' %}<button onclick="copyKey('{{ k.key }}')" class="text-xs px-2 py-0.5 rounded cursor-pointer" style="background:rgba(99,102,241,.1);color:#818cf8;border:1px solid rgba(99,102,241,.2)">Copy</button>{% endif %}</div></td><td><span class="badge badge-{{ k.status }}">{{ k.status }}</span></td><td style="color:var(--muted)">{{ k.last_used.strftime('%b %d, %H:%M') if k.last_used else '—' }}</td><td style="color:var(--muted)">{{ k.created_at.strftime('%b %d, %Y') }}</td><td>{% if k.status=='active' %}<button onclick="revokeKey({{ k.id }})" class="btn-danger">Revoke</button>{% else %}<span style="color:var(--muted);font-size:12px">Revoked</span>{% endif %}</td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<div class="text-center py-12" style="color:var(--muted)">No API keys yet</div>{% endif %}
+  </div>
+  <div x-show="showCreate" x-cloak class="fixed inset-0 flex items-center justify-center z-50 modal-backdrop">
+    <div class="modal w-full max-w-sm" @click.outside="showCreate = false">
+      <h3 class="text-lg font-semibold text-white mb-4">Create API Key</h3>
+      <div class="mb-4"><label class="text-xs font-medium mb-1.5 block" style="color:var(--muted)">Key Name</label><input x-model="keyName" placeholder="e.g. Production App"></div>
+      <div x-show="newKey" x-cloak class="mb-4 p-3 rounded-lg" style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2)"><div class="text-xs mb-1" style="color:#4ade80">✓ Key created — copy it now</div><div class="font-mono text-sm break-all" style="color:#86efac" x-text="newKey"></div><button @click="copyKey(newKey)" class="btn-ghost mt-2" style="font-size:12px;padding:5px 10px;color:#4ade80">Copy</button></div>
+      <div class="flex gap-3 justify-end"><button @click="showCreate=false;newKey=''" class="btn-ghost">{{ 'Done' if newKey else 'Cancel' }}</button><button x-show="!newKey" @click="createKey()" class="btn-primary" :disabled="creating"><span x-text="creating ? 'Creating…' : 'Create Key'"></span></button></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function keyManager(){return{showCreate:false,keyName:'',newKey:'',creating:false,createKey(){this.creating=true;fetch('/console/api/keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:this.keyName||'New Key'})}).then(r=>r.json()).then(d=>{this.creating=false;if(d.error){showToast(d.error,'error');}else{this.newKey=d.key;setTimeout(()=>location.reload(),3000);}}).catch(()=>{this.creating=false;showToast('Error','error');});}}}
+function copyKey(k){navigator.clipboard.writeText(k).then(()=>showToast('Copied!'));}
+function revokeKey(id){if(!confirm('Revoke this API key?'))return;fetch('/console/api/keys/'+id,{method:'DELETE'}).then(()=>{showToast('Key revoked');setTimeout(()=>location.reload(),600);}).catch(()=>showToast('Error','error'));}
+</script>
+{% endblock %}

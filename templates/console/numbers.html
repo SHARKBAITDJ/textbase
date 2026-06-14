@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Phone Numbers — {{ app_name }}{% endblock %}
+{% block topbar_title %}Phone Numbers{% endblock %}
+{% block content %}
+<div class="page" x-data="numberManager()">
+  <div class="flex items-center justify-between mb-6">
+    <div><h1 class="text-xl font-bold text-white">Phone Numbers</h1><p class="text-sm mt-1" style="color:var(--muted)">Register numbers and assign their carrier for SMS delivery routing</p></div>
+    <button @click="showAdd = true" class="btn-primary">Add Number</button>
+  </div>
+  <div class="card">
+    {% if numbers %}
+    <table class="data-table"><thead><tr><th>Phone Number</th><th>Friendly Name</th><th>Carrier</th><th>Webhook</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+    {% for n in numbers %}
+    <tr id="num-row-{{ n.id }}"><td><span class="font-mono font-semibold">{{ n.number }}</span></td><td style="color:#94a3b8">{{ n.friendly_name or '—' }}</td>
+    <td>{% if n.carrier %}<span class="badge badge-active">{{ n.carrier_label() }}</span>{% else %}<button onclick="openCarrierEdit({{ n.id }})" class="text-xs px-2 py-0.5 rounded cursor-pointer" style="background:rgba(245,158,11,.1);color:#fbbf24;border:1px solid rgba(245,158,11,.2)">Set carrier ↗</button>{% endif %}</td>
+    <td>{% if n.sms_url %}<span class="font-mono text-xs truncate" style="color:#94a3b8;max-width:160px;display:block">{{ n.sms_url }}</span>{% else %}<span style="color:var(--muted)">—</span>{% endif %}</td>
+    <td><span class="badge badge-{{ n.status }}">{{ n.status }}</span></td>
+    <td><button onclick="deleteNumber({{ n.id }})" class="btn-danger">Delete</button></td></tr>
+    {% endfor %}
+    </tbody></table>
+    {% else %}
+    <div class="text-center py-16"><div style="font-size:40px;margin-bottom:12px">📱</div><div class="font-semibold text-white mb-1">No numbers registered</div><div class="text-sm mb-5" style="color:var(--muted)">Register your numbers here. Carrier is auto-looked up on send.</div><button @click="showAdd = true" class="btn-primary">Add First Number</button></div>
+    {% endif %}
+  </div>
+  <div x-show="showAdd" x-cloak class="fixed inset-0 flex items-center justify-center z-50 modal-backdrop">
+    <div class="modal w-full max-w-md" @click.outside="showAdd = false">
+      <h3 class="text-lg font-semibold text-white mb-4">Add Phone Number</h3>
+      <div class="mb-3"><label class="text-xs font-medium mb-1.5 block" style="color:var(--muted)">Phone Number</label><input type="tel" x-model="newNum" placeholder="+1 555 000 0000"></div>
+      <div class="mb-3"><label class="text-xs font-medium mb-1.5 block" style="color:var(--muted)">Friendly Name</label><input x-model="newName" placeholder="e.g. Marketing Line"></div>
+      <div class="mb-3"><label class="text-xs font-medium mb-1.5 block" style="color:var(--muted)">Carrier</label><select x-model="newCarrier"><option value="">-- Select carrier --</option>{% for key, label in carrier_list %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></div>
+      <div class="mb-4"><label class="text-xs font-medium mb-1.5 block" style="color:var(--muted)">Inbound Webhook URL</label><input x-model="newWebhook" placeholder="https://your-app.com/sms/inbound"></div>
+      <div class="flex gap-3 justify-end"><button @click="showAdd = false" class="btn-ghost">Cancel</button><button @click="addNumber()" class="btn-primary" :disabled="adding"><span x-text="adding ? 'Adding…' : 'Add Number'"></span></button></div>
+    </div>
+  </div>
+  <div x-show="showCarrier" x-cloak class="fixed inset-0 flex items-center justify-center z-50 modal-backdrop">
+    <div class="modal w-full max-w-sm" @click.outside="showCarrier = false">
+      <h3 class="text-lg font-semibold text-white mb-3">Update Carrier</h3>
+      <select x-model="editCarrier" class="mb-4"><option value="">-- Select carrier --</option>{% for key, label in carrier_list %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select>
+      <div class="flex gap-3 justify-end"><button @click="showCarrier = false" class="btn-ghost">Cancel</button><button @click="saveCarrier()" class="btn-primary" :disabled="!editCarrier">Save</button></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function numberManager(){return{showAdd:false,showCarrier:false,newNum:'',newName:'',newCarrier:'',newWebhook:'',editId:null,editCarrier:'',adding:false,addNumber(){this.adding=true;fetch('/console/api/numbers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({number:this.newNum,friendly_name:this.newName,carrier:this.newCarrier||null,sms_url:this.newWebhook||null})}).then(r=>r.json()).then(d=>{this.adding=false;if(d.error){showToast(d.error,'error');}else{showToast('Number added!');setTimeout(()=>location.reload(),600);}this.showAdd=false;}).catch(()=>{this.adding=false;showToast('Error','error');});},saveCarrier(){fetch('/console/api/numbers/'+this.editId+'/carrier',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({carrier:this.editCarrier})}).then(r=>r.json()).then(d=>{if(d.error)showToast(d.error,'error');else{showToast('Carrier updated!');setTimeout(()=>location.reload(),600);}this.showCarrier=false;});}}}
+function openCarrierEdit(id){const c=Alpine.$data(document.querySelector('[x-data]'));c.editId=id;c.editCarrier='';c.showCarrier=true;}
+function deleteNumber(id){if(!confirm('Delete this number?'))return;fetch('/console/api/numbers/'+id,{method:'DELETE'}).then(()=>{showToast('Deleted');document.getElementById('num-row-'+id).remove();}).catch(()=>showToast('Error','error'));}
+</script>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Messages — {{ app_name }}{% endblock %}
+{% block topbar_title %}Message Logs{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-xl font-bold text-white">Messages</h1>
+    <div class="flex gap-2">
+      <div class="tab-bar">
+        <a href="?status=all&direction={{ dir_f }}" class="tab {% if status_f=='all' %}active{% endif %}">All</a>
+        <a href="?status=sent&direction={{ dir_f }}" class="tab {% if status_f=='sent' %}active{% endif %}">Sent</a>
+        <a href="?status=failed&direction={{ dir_f }}" class="tab {% if status_f=='failed' %}active{% endif %}">Failed</a>
+        <a href="?status=received&direction={{ dir_f }}" class="tab {% if status_f=='received' %}active{% endif %}">Inbound</a>
+      </div>
+      <div class="tab-bar" style="margin-left:8px">
+        <a href="?status={{ status_f }}&direction=all" class="tab {% if dir_f=='all' %}active{% endif %}">All</a>
+        <a href="?status={{ status_f }}&direction=outbound-api" class="tab {% if dir_f=='outbound-api' %}active{% endif %}">Outbound</a>
+        <a href="?status={{ status_f }}&direction=inbound" class="tab {% if dir_f=='inbound' %}active{% endif %}">Inbound</a>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    {% if messages %}
+    <table class="data-table"><thead><tr><th>SID</th><th>From</th><th>To</th><th>Body</th><th>Status</th><th>Direction</th><th>Carrier</th><th>Sent</th></tr></thead><tbody>
+    {% for msg in messages %}
+    <tr><td><span class="font-mono text-xs" style="color:var(--accent2)">{{ msg.sid[:14] }}…</span></td><td><span class="font-mono text-sm">{{ msg.from_num or '—' }}</span></td><td><span class="font-mono text-sm">{{ msg.to_num }}</span></td>
+    <td style="max-width:280px"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#94a3b8">{{ msg.body[:80] }}{% if msg.body and msg.body|length > 80 %}…{% endif %}</div>{% if msg.error_msg %}<div class="text-xs mt-0.5" style="color:#f87171">{{ msg.error_msg[:60] }}</div>{% endif %}</td>
+    <td><span class="badge badge-{{ msg.status }}">{{ msg.status }}</span></td>
+    <td><span class="badge {% if msg.direction=='inbound' %}badge-in{% else %}badge-out{% endif %}">{{ 'In' if msg.direction=='inbound' else 'Out' }}</span></td>
+    <td>{% if msg.carrier %}<span class="text-xs px-1.5 py-0.5 rounded" style="background:rgba(99,102,241,.1);color:#818cf8">{{ msg.carrier }}</span>{% else %}<span style="color:var(--muted)">—</span>{% endif %}</td>
+    <td style="color:var(--muted)">{{ msg.sent_at.strftime('%b %d, %H:%M') }}</td></tr>
+    {% endfor %}
+    </tbody></table>
+    {% else %}
+    <div class="text-center py-16"><div style="font-size:40px;margin-bottom:12px">📭</div><div class="font-semibold text-white">No messages</div><div class="text-sm mt-1" style="color:var(--muted)">Messages appear here once you start sending via the API</div></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

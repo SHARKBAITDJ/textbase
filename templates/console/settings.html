@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Settings — {{ app_name }}{% endblock %}
+{% block topbar_title %}Settings{% endblock %}
+{% block content %}
+<div class="page" style="max-width:800px">
+  <div class="card p-6 mb-6">
+    <h2 class="font-semibold text-white mb-4">Account Credentials</h2>
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <div><div class="text-xs font-medium mb-1.5" style="color:var(--muted)">Account SID</div><div class="flex items-center gap-2"><span class="font-mono text-sm px-3 py-2 rounded-lg flex-1 truncate" style="background:var(--surface);border:1px solid var(--border);color:#818cf8">{{ cfg.account_sid }}</span><button onclick="navigator.clipboard.writeText('{{ cfg.account_sid }}').then(()=>showToast('Copied!'))" class="btn-ghost" style="font-size:12px;padding:8px 12px;flex-shrink:0">Copy</button></div></div>
+      <div><div class="text-xs font-medium mb-1.5" style="color:var(--muted)">Auth Token</div><div class="flex items-center gap-2"><span class="font-mono text-sm px-3 py-2 rounded-lg flex-1 truncate" style="background:var(--surface);border:1px solid var(--border);color:#94a3b8">{{ cfg.auth_token[:10] }}••••••••••</span><button onclick="navigator.clipboard.writeText('{{ cfg.auth_token }}').then(()=>showToast('Copied!'))" class="btn-ghost" style="font-size:12px;padding:8px 12px;flex-shrink:0">Copy</button></div></div>
+    </div>
+    <div><div class="text-xs font-medium mb-1.5" style="color:var(--muted)">API Key</div><div class="flex items-center gap-2"><span class="font-mono text-sm px-3 py-2 rounded-lg flex-1 truncate" style="background:var(--surface);border:1px solid var(--border);color:#4ade80">{{ cfg.api_key[:24] if cfg.api_key else '-- no keys --' }}…</span><button onclick="navigator.clipboard.writeText('{{ cfg.api_key }}').then(()=>showToast('Copied!'))" class="btn-ghost" style="font-size:12px;padding:8px 12px;flex-shrink:0">Copy</button><a href="/console/api-keys" class="btn-ghost" style="font-size:12px;padding:8px 12px;flex-shrink:0">Manage →</a></div></div>
+  </div>
+  <div class="card p-6 mb-6">
+    <div class="flex items-center justify-between mb-4"><h2 class="font-semibold text-white">SMTP Delivery</h2>{% if cfg.smtp_configured %}<span class="badge badge-live">✓ Connected</span>{% else %}<span class="badge badge-sandbox">Not configured · sandbox</span>{% endif %}</div>
+    {% if not cfg.smtp_configured %}
+    <div class="p-4 rounded-lg mb-5" style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2)"><div class="text-sm" style="color:#fbbf24">📦 Sandbox mode — sends are logged only. Add SMTP credentials to deliver real SMS.</div></div>
+    {% endif %}
+    <div class="code-block text-xs mb-5" style="color:#94a3b8">SMTP_HOST=smtp.gmail.com<br>SMTP_PORT=587<br>SMTP_USER=<span style="color:#fbbf24">yourmail@gmail.com</span><br>SMTP_PASSWORD=<span style="color:#fbbf24">your-app-password</span></div>
+    <div class="grid grid-cols-3 gap-3">
+      <a href="https://myaccount.google.com/apppasswords" target="_blank" class="p-3 rounded-lg text-center" style="background:var(--surface);border:1px solid var(--border);text-decoration:none"><div class="font-semibold text-sm text-white">Gmail</div><div class="text-xs mt-1" style="color:var(--muted)">500/day · App Password</div><div class="text-xs mt-1" style="color:#818cf8">→ apppasswords</div></a>
+      <a href="https://app.brevo.com/settings/keys/smtp" target="_blank" class="p-3 rounded-lg text-center" style="background:var(--surface);border:1px solid var(--border);text-decoration:none"><div class="font-semibold text-sm text-white">Brevo</div><div class="text-xs mt-1" style="color:var(--muted)">300/day · SMTP key</div></a>
+      <a href="https://resend.com/api-keys" target="_blank" class="p-3 rounded-lg text-center" style="background:var(--surface);border:1px solid var(--border);text-decoration:none"><div class="font-semibold text-sm text-white">Resend</div><div class="text-xs mt-1" style="color:var(--muted)">100/day · API key</div></a>
+    </div>
+  </div>
+  <div class="card p-6">
+    <h2 class="font-semibold text-white mb-2">Free Hosting (Forever)</h2>
+    <div class="grid grid-cols-3 gap-3 mb-4">
+      <a href="https://cloud.oracle.com/free" target="_blank" class="p-3 rounded-lg" style="background:var(--surface);border:1px solid var(--border);text-decoration:none;display:block"><div class="font-semibold text-sm text-white">Oracle Cloud Free</div><div class="text-xs mt-1" style="color:#4ade80">4 OCPUs · 24 GB · forever</div></a>
+      <a href="https://fly.io" target="_blank" class="p-3 rounded-lg" style="background:var(--surface);border:1px solid var(--border);text-decoration:none;display:block"><div class="font-semibold text-sm text-white">Fly.io</div><div class="text-xs mt-1" style="color:#4ade80">3 shared VMs · forever</div></a>
+      <a href="https://render.com" target="_blank" class="p-3 rounded-lg" style="background:var(--surface);border:1px solid var(--border);text-decoration:none;display:block"><div class="font-semibold text-sm text-white">Render</div><div class="text-xs mt-1" style="color:#fbbf24">Free (sleeps on idle)</div></a>
+    </div>
+    <div class="code-block text-xs" style="color:#94a3b8">gunicorn app:app --bind 0.0.0.0:$PORT</div>
+  </div>
+</div>
+{% endblock %}

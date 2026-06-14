@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <style>
+    :root {
+      --bg:      #080812;
+      --surface: #0f0f1e;
+      --border:  #1e1e38;
+      --card:    #12121f;
+      --accent:  #6366f1;
+      --accent2: #818cf8;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --green:   #22c55e;
+      --red:     #ef4444;
+      --yellow:  #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body { background:var(--bg); color:var(--text); font-family:'Inter',system-ui,sans-serif; margin:0; min-height:100vh; display:flex; }
+    [x-cloak] { display:none!important; }
+    .sidebar { width:240px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; position:fixed; top:0; left:0; bottom:0; z-index:10; }
+    .sidebar-logo { padding:20px 20px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+    .logo-icon { width:32px; height:32px; border-radius:8px; background:linear-gradient(135deg,#6366f1,#8b5cf6); display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:700; color:#fff; flex-shrink:0; }
+    .logo-text { font-size:16px; font-weight:700; color:var(--text); }
+    .logo-sub  { font-size:10px; color:var(--muted); margin-top:1px; }
+    .nav-section { padding:16px 12px 8px; }
+    .nav-label { font-size:10px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; padding:0 8px 8px; }
+    .nav-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:8px; margin-bottom:2px; text-decoration:none; color:var(--muted); font-size:13.5px; font-weight:500; transition:all .15s; }
+    .nav-item:hover { background:var(--border); color:var(--text); }
+    .nav-item.active { background:rgba(99,102,241,.15); color:var(--accent2); }
+    .nav-item svg { flex-shrink:0; }
+    .mode-badge { margin:auto 12px 16px; padding:8px 12px; border-radius:8px; font-size:12px; display:flex; align-items:center; gap:8px; }
+    .mode-live    { background:rgba(34,197,94,.1); border:1px solid rgba(34,197,94,.2); color:#4ade80; }
+    .mode-sandbox { background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.2); color:#fbbf24; }
+    .dot-live    { width:6px; height:6px; border-radius:50%; background:#22c55e; animation:pulse 2s infinite; }
+    .dot-sandbox { width:6px; height:6px; border-radius:50%; background:#f59e0b; animation:pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+    .main { margin-left:240px; flex:1; min-height:100vh; }
+    .topbar { height:56px; display:flex; align-items:center; justify-content:space-between; padding:0 32px; border-bottom:1px solid var(--border); background:rgba(8,8,18,.8); backdrop-filter:blur(8px); position:sticky; top:0; z-index:9; }
+    .topbar-title { font-size:15px; font-weight:600; color:var(--text); }
+    .topbar-right { display:flex; align-items:center; gap:10px; }
+    .page { padding:32px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+    .stat-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px 24px; }
+    .stat-label { font-size:12px; color:var(--muted); font-weight:500; text-transform:uppercase; letter-spacing:.05em; }
+    .stat-value { font-size:28px; font-weight:700; color:var(--text); margin-top:6px; }
+    table.data-table { width:100%; border-collapse:collapse; }
+    table.data-table th { text-align:left; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; padding:10px 20px; border-bottom:1px solid var(--border); background:rgba(30,30,56,.5); }
+    table.data-table td { padding:12px 20px; border-bottom:1px solid rgba(30,30,56,.5); font-size:13.5px; color:var(--text); }
+    table.data-table tr:last-child td { border-bottom:none; }
+    table.data-table tr:hover td { background:rgba(99,102,241,.04); }
+    .badge { display:inline-flex; align-items:center; font-size:11px; font-weight:600; padding:3px 8px; border-radius:5px; }
+    .badge-sent      { background:rgba(34,197,94,.12); color:#4ade80; }
+    .badge-failed    { background:rgba(239,68,68,.12); color:#f87171; }
+    .badge-queued    { background:rgba(99,102,241,.12); color:#818cf8; }
+    .badge-received  { background:rgba(56,189,248,.12); color:#7dd3fc; }
+    .badge-sandbox   { background:rgba(245,158,11,.12); color:#fbbf24; }
+    .badge-active    { background:rgba(34,197,94,.12); color:#4ade80; }
+    .badge-revoked   { background:rgba(239,68,68,.12); color:#f87171; }
+    .badge-live      { background:rgba(34,197,94,.12); color:#4ade80; }
+    .badge-out       { background:rgba(168,85,247,.1); color:#c084fc; }
+    .badge-in        { background:rgba(56,189,248,.1); color:#7dd3fc; }
+    input, select, textarea { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:9px 13px; font-size:14px; outline:none; }
+    input:focus, select:focus, textarea:focus { border-color:var(--accent); }
+    select { appearance:none; }
+    .btn-primary { display:inline-flex; align-items:center; gap:7px; background:var(--accent); color:#fff; border:none; padding:9px 18px; border-radius:8px; font-size:13.5px; font-weight:600; cursor:pointer; transition:all .15s; text-decoration:none; }
+    .btn-primary:hover { background:#4f46e5; transform:translateY(-1px); }
+    .btn-primary:disabled { opacity:.5; cursor:default; transform:none; }
+    .btn-ghost { display:inline-flex; align-items:center; gap:7px; background:transparent; color:var(--muted); border:1px solid var(--border); padding:8px 14px; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; transition:all .15s; text-decoration:none; }
+    .btn-ghost:hover { border-color:var(--accent2); color:var(--accent2); }
+    .btn-danger { display:inline-flex; align-items:center; gap:5px; background:rgba(239,68,68,.12); color:#f87171; border:1px solid rgba(239,68,68,.2); padding:6px 12px; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer; transition:all .15s; }
+    .btn-danger:hover { background:rgba(239,68,68,.2); }
+    .code-block { font-family:'JetBrains Mono','Fira Code',monospace; font-size:13px; background:#060610; border:1px solid var(--border); border-radius:8px; padding:16px; overflow-x:auto; line-height:1.6; }
+    #toast { position:fixed; bottom:24px; right:24px; z-index:100; padding:11px 18px; border-radius:8px; font-size:13.5px; font-weight:500; background:#1e293b; color:#e2e8f0; border:1px solid #2e3a4e; transform:translateY(80px); opacity:0; transition:all .25s; pointer-events:none; }
+    #toast.show { transform:translateY(0); opacity:1; }
+    #toast.error { background:rgba(239,68,68,.15); border-color:rgba(239,68,68,.3); color:#f87171; }
+    .modal-backdrop { background:rgba(0,0,0,.7); }
+    .modal { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:24px; }
+    .tab-bar { display:flex; gap:4px; }
+    .tab { padding:7px 14px; border-radius:7px; font-size:13px; font-weight:500; color:var(--muted); cursor:pointer; text-decoration:none; transition:all .15s; }
+    .tab:hover { color:var(--text); }
+    .tab.active { background:rgba(99,102,241,.15); color:var(--accent2); }
+  </style>
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">T</div>
+    <div><div class="logo-text">{{ app_name }}</div><div class="logo-sub">SMS Platform</div></div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Console</div>
+    <a href="/console" class="nav-item {% if active_nav=='dashboard' %}active{% endif %}"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
+    <a href="/console/messages" class="nav-item {% if active_nav=='messages' %}active{% endif %}"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>Messages</a>
+    <a href="/console/numbers" class="nav-item {% if active_nav=='numbers' %}active{% endif %}"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>Phone Numbers</a>
+    <a href="/console/api-keys" class="nav-item {% if active_nav=='api_keys' %}active{% endif %}"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>API Keys</a>
+    <a href="/console/settings" class="nav-item {% if active_nav=='settings' %}active{% endif %}"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Settings</a>
+  </div>
+  <div style="margin-top:auto; padding:8px 12px 16px;">
+    <div class="mode-badge mode-{{ mode }}"><div class="dot-{{ mode }}"></div><span class="font-semibold text-xs">{{ 'Live · SMTP active' if mode == 'live' else 'Sandbox mode' }}</span></div>
+    {% if account %}<div class="px-3 pb-2"><div class="text-xs" style="color:var(--muted)">Account SID</div><div class="font-mono text-xs mt-0.5 truncate" style="color:#64748b">{{ account.sid[:20] }}…</div></div>{% endif %}
+  </div>
+</nav>
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-title">{% block topbar_title %}{% endblock %}</div>
+    <div class="topbar-right"><a href="/console/settings" class="btn-ghost" style="font-size:12px;padding:6px 12px">Docs</a></div>
+  </div>
+  {% block content %}{% endblock %}
+</main>
+<div id="toast"></div>
+<script>
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (type === 'error' ? ' error' : '');
+  setTimeout(() => { t.className = ''; }, 3000);
+}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
