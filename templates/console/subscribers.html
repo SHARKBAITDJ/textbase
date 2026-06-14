@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+{% block title %}Subscribers — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8" x-data="subscriberManager()">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Subscribers</h1>
+      <p class="text-slate-400 mt-1 text-sm">Manage lists of phone numbers for broadcasts.</p>
+    </div>
+    <button @click="showNewList = true"
+            class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      New List
+    </button>
+  </div>
+
+  <div class="flex gap-6">
+
+    <!-- Sidebar: lists -->
+    <div class="w-64 flex-shrink-0">
+      <p class="text-xs text-slate-500 uppercase tracking-wider mb-2 px-1">Your Lists</p>
+      {% if lists %}
+        {% for lst in lists %}
+        <a href="/console/subscribers?list={{ lst.id }}"
+           class="block px-3 py-2.5 rounded-lg mb-1 transition text-sm
+                  {{ 'bg-indigo-600/30 border border-indigo-500/40 text-white' if selected_list and selected_list.id == lst.id else 'text-slate-300 hover:bg-slate-700/50' }}">
+          <div class="font-medium truncate">{{ lst.name }}</div>
+          <div class="text-xs mt-0.5 {{ 'text-indigo-300' if selected_list and selected_list.id == lst.id else 'text-slate-500' }}">
+            {{ lst.active_count() }} active
+          </div>
+        </a>
+        {% endfor %}
+      {% else %}
+        <div class="text-slate-600 text-sm px-1 py-4 text-center">No lists yet.<br>Create one to start.</div>
+      {% endif %}
+    </div>
+
+    <!-- Main: subscribers in selected list -->
+    <div class="flex-1 min-w-0">
+      {% if selected_list %}
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-lg font-semibold text-white">{{ selected_list.name }}</h2>
+          {% if selected_list.description %}
+          <p class="text-sm text-slate-400">{{ selected_list.description }}</p>
+          {% endif %}
+        </div>
+        <div class="flex gap-2">
+          <button @click="showImport = true"
+                  class="flex items-center gap-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-lg transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+            </svg>
+            Import CSV
+          </button>
+          <button @click="showAddSub = true"
+                  class="flex items-center gap-1.5 text-sm bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add Number
+          </button>
+        </div>
+      </div>
+
+      <!-- Subscriber table -->
+      <div class="bg-slate-800/60 border border-slate-700/50 rounded-xl overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-900/50 text-slate-400 text-xs uppercase tracking-wider">
+            <tr>
+              <th class="text-left px-4 py-3">Phone</th>
+              <th class="text-left px-4 py-3">Name</th>
+              <th class="text-left px-4 py-3">Carrier</th>
+              <th class="text-left px-4 py-3">Status</th>
+              <th class="text-left px-4 py-3">Added</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-700/40">
+            {% for sub in subs %}
+            <tr class="hover:bg-slate-700/20 transition" id="sub-row-{{ sub.id }}">
+              <td class="px-4 py-3 font-mono text-slate-200">{{ sub.phone }}</td>
+              <td class="px-4 py-3 text-slate-300">{{ sub.name or '—' }}</td>
+              <td class="px-4 py-3 text-slate-400 text-xs">{{ sub.carrier_label() }}</td>
+              <td class="px-4 py-3">
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium
+                  {{ 'bg-emerald-900/40 text-emerald-300' if sub.status == 'active' else 'bg-red-900/40 text-red-400' }}">
+                  {{ sub.status.replace('_', ' ') }}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-slate-500 text-xs">{{ sub.created_at.strftime('%b %d') }}</td>
+              <td class="px-4 py-3 text-right">
+                <button onclick="removeSubscriber({{ sub.id }})"
+                        class="text-slate-600 hover:text-red-400 transition p-1">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6" class="px-4 py-10 text-center text-slate-600">
+                No subscribers yet. Add numbers or import a CSV.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="flex flex-col items-center justify-center h-64 text-slate-600">
+        <svg class="w-12 h-12 mb-3 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <p class="text-sm">Create a list to get started</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- New List modal -->
+  <div x-show="showNewList" x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+       @keydown.escape.window="showNewList = false">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6" @click.stop>
+      <h2 class="text-lg font-bold text-white mb-5">New Subscriber List</h2>
+      <div class="mb-4">
+        <label class="block text-xs text-slate-400 mb-1.5">List Name <span class="text-red-400">*</span></label>
+        <input id="list-name" type="text" placeholder="e.g. Unlimited Plan Subscribers"
+               class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500">
+      </div>
+      <div class="mb-6">
+        <label class="block text-xs text-slate-400 mb-1.5">Description (optional)</label>
+        <input id="list-desc" type="text" placeholder="Optional description"
+               class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500">
+      </div>
+      <div class="flex gap-3 justify-end">
+        <button @click="showNewList = false" class="text-sm text-slate-400 hover:text-white px-4 py-2 rounded-lg transition">Cancel</button>
+        <button @click="createList()"
+                class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition">
+          Create List
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Subscriber modal -->
+  {% if selected_list %}
+  <div x-show="showAddSub" x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+       @keydown.escape.window="showAddSub = false">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6" @click.stop>
+      <h2 class="text-lg font-bold text-white mb-5">Add Phone Number</h2>
+      <div class="mb-4">
+        <label class="block text-xs text-slate-400 mb-1.5">Phone Number <span class="text-red-400">*</span></label>
+        <input id="sub-phone" type="tel" placeholder="+15551234567"
+               class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-indigo-500">
+      </div>
+      <div class="mb-4">
+        <label class="block text-xs text-slate-400 mb-1.5">Name (optional)</label>
+        <input id="sub-name" type="text" placeholder="John Doe"
+               class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500">
+      </div>
+      <div class="mb-6">
+        <label class="block text-xs text-slate-400 mb-1.5">Carrier (for delivery)</label>
+        <select id="sub-carrier" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500">
+          <option value="">— Unknown —</option>
+          {% for key, label in carrier_list %}
+          <option value="{{ key }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="flex gap-3 justify-end">
+        <button @click="showAddSub = false" class="text-sm text-slate-400 hover:text-white px-4 py-2 rounded-lg transition">Cancel</button>
+        <button @click="addSubscriber()"
+                class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition">
+          Add
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CSV Import modal -->
+  <div x-show="showImport" x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+       @keydown.escape.window="showImport = false">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6" @click.stop>
+      <h2 class="text-lg font-bold text-white mb-2">Import from CSV</h2>
+      <p class="text-slate-400 text-sm mb-5">
+        Paste CSV rows below. Format: <code class="bg-slate-700 px-1.5 py-0.5 rounded text-xs">phone, name, carrier</code><br>
+        Carrier column is optional. Example carriers: att, verizon, tmobile, sprint
+      </p>
+      <textarea id="import-csv" rows="8" placeholder="15551234567,John Doe,verizon&#10;15559876543,Jane Smith,att&#10;15554445555,,tmobile"
+                class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-indigo-500 resize-none mb-4"></textarea>
+      <div id="import-result" class="text-sm text-slate-400 mb-4 hidden"></div>
+      <div class="flex gap-3 justify-end">
+        <button @click="showImport = false" class="text-sm text-slate-400 hover:text-white px-4 py-2 rounded-lg transition">Cancel</button>
+        <button @click="importCSV()"
+                class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition">
+          Import
+        </button>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+const SELECTED_LIST_ID = {{ selected_list.id if selected_list else 'null' }};
+
+function subscriberManager() {
+  return {
+    showNewList: false,
+    showAddSub: false,
+    showImport: false,
+
+    createList() {
+      const name = document.getElementById('list-name').value.trim();
+      const desc = document.getElementById('list-desc').value.trim();
+      if (!name) return;
+      fetch('/console/api/lists', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name, description: desc })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { alert(data.error); return; }
+        window.location.href = `/console/subscribers?list=${data.id}`;
+      });
+    },
+
+    addSubscriber() {
+      const phone   = document.getElementById('sub-phone').value.trim();
+      const name    = document.getElementById('sub-name').value.trim();
+      const carrier = document.getElementById('sub-carrier').value;
+      if (!phone || !SELECTED_LIST_ID) return;
+      fetch(`/console/api/lists/${SELECTED_LIST_ID}/subscribers`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ phone, name, carrier })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { alert(data.error); return; }
+        this.showAddSub = false;
+        location.reload();
+      });
+    },
+
+    importCSV() {
+      const raw = document.getElementById('import-csv').value.trim();
+      if (!raw || !SELECTED_LIST_ID) return;
+      const lines = raw.split('\n').filter(l => l.trim());
+      const subscribers = lines.map(line => {
+        const [phone, name, carrier] = line.split(',').map(s => s.trim());
+        return { phone, name: name || '', carrier: carrier || '' };
+      }).filter(s => s.phone);
+
+      fetch(`/console/api/lists/${SELECTED_LIST_ID}/subscribers/import`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ subscribers })
+      })
+      .then(r => r.json())
+      .then(data => {
+        const el = document.getElementById('import-result');
+        el.classList.remove('hidden');
+        el.textContent = `✓ Added ${data.added}, skipped ${data.skipped} (duplicates/invalid)`;
+        el.className = 'text-sm text-emerald-400 mb-4';
+        setTimeout(() => { this.showImport = false; location.reload(); }, 1500);
+      });
+    }
+  };
+}
+
+function removeSubscriber(id) {
+  if (!confirm('Remove this subscriber?')) return;
+  fetch(`/console/api/subscribers/${id}`, { method: 'DELETE' })
+  .then(() => {
+    const row = document.getElementById(`sub-row-${id}`);
+    if (row) row.remove();
+  });
+}
+</script>
+{% endblock %}

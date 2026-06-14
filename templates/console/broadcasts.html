@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block title %}Broadcasts — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-8" x-data="broadcastManager()">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Broadcasts</h1>
+      <p class="text-slate-400 mt-1 text-sm">
+        Send one message to every active subscriber in a list. Schedule or send immediately.
+      </p>
+    </div>
+    {% if lists %}
+    <button @click="showNew = true"
+            class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      New Broadcast
+    </button>
+    {% endif %}
+  </div>
+
+  {% if not lists %}
+  <!-- No lists warning -->
+  <div class="bg-amber-900/20 border border-amber-700/40 rounded-xl p-5 mb-6 flex gap-3">
+    <svg class="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+    </svg>
+    <div class="text-sm text-amber-200">
+      You need at least one <strong>Subscriber List</strong> before creating a broadcast.
+      <a href="/console/subscribers" class="underline ml-1">Create a list →</a>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Scheduled automation tip -->
+  <div class="bg-slate-800/40 border border-slate-700/40 rounded-xl p-4 mb-8 flex gap-3 text-sm">
+    <svg class="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <div class="text-slate-400">
+      <strong class="text-slate-300">Scheduled broadcasts</strong> fire automatically when you hit
+      <code class="bg-slate-700 px-1.5 py-0.5 rounded text-xs">/run-scheduled</code> on a cron.
+      Free option: add that URL to <a href="https://cron-job.org" target="_blank" class="text-indigo-400 hover:underline">cron-job.org</a>
+      every 5 minutes — it's free.
+    </div>
+  </div>
+
+  <!-- Broadcasts table -->
+  <div class="bg-slate-800/60 border border-slate-700/50 rounded-xl overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-900/50 text-slate-400 text-xs uppercase tracking-wider">
+        <tr>
+          <th class="text-left px-5 py-3.5">Name</th>
+          <th class="text-left px-5 py-3.5">List</th>
+          <th class="text-left px-5 py-3.5">Message</th>
+          <th class="text-left px-5 py-3.5">Scheduled</th>
+          <th class="text-left px-5 py-3.5">Status</th>
+          <th class="text-left px-5 py-3.5">Results</th>
+          <th class="px-5 py-3.5"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-700/40">
+        {% for bc in broadcasts %}
+        <tr class="hover:bg-slate-700/20 transition" id="bc-row-{{ bc.id }}">
+          <td class="px-5 py-4 font-medium text-white">{{ bc.name }}</td>
+          <td class="px-5 py-4 text-slate-400 text-xs">
+            {{ bc.subscriber_list.name if bc.subscriber_list else '—' }}
+          </td>
+          <td class="px-5 py-4 text-slate-300 max-w-xs">
+            <span class="truncate block text-xs" title="{{ bc.body }}">{{ bc.body }}</span>
+          </td>
+          <td class="px-5 py-4 text-slate-400 text-xs font-mono">
+            {{ bc.scheduled_at.strftime('%b %d %H:%M') if bc.scheduled_at else 'Immediate' }}
+          </td>
+          <td class="px-5 py-4">
+            <span id="bc-status-{{ bc.id }}"
+                  class="text-xs px-2.5 py-1 rounded-full font-medium
+                  {% if bc.status == 'sent' %}bg-emerald-900/40 text-emerald-300
+                  {% elif bc.status == 'sending' %}bg-blue-900/40 text-blue-300
+                  {% elif bc.status == 'scheduled' %}bg-amber-900/40 text-amber-300
+                  {% elif bc.status == 'failed' %}bg-red-900/40 text-red-400
+                  {% else %}bg-slate-700 text-slate-400{% endif %}">
+              {{ bc.status }}
+            </span>
+          </td>
+          <td class="px-5 py-4 text-xs font-mono">
+            {% if bc.status == 'sent' %}
+            <span class="text-emerald-400">✓ {{ bc.sent_count }}</span>
+            {% if bc.failed_count %}<span class="text-red-400 ml-1">✗ {{ bc.failed_count }}</span>{% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td class="px-5 py-4 text-right flex items-center gap-2 justify-end">
+            {% if bc.status in ('draft', 'scheduled') %}
+            <button onclick="sendNow({{ bc.id }})"
+                    class="text-xs bg-indigo-700/60 hover:bg-indigo-600 text-indigo-200 px-3 py-1.5 rounded-lg transition">
+              Send now
+            </button>
+            <button onclick="deleteBroadcast({{ bc.id }})"
+                    class="text-slate-600 hover:text-red-400 transition p-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="px-5 py-12 text-center text-slate-600">
+            <svg class="w-10 h-10 mx-auto mb-3 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+            </svg>
+            <p class="text-sm">No broadcasts yet.</p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- New Broadcast modal -->
+  <div x-show="showNew" x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+       @keydown.escape.window="showNew = false">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6" @click.stop>
+      <h2 class="text-lg font-bold text-white mb-5">New Broadcast</h2>
+
+      <div class="mb-4">
+        <label class="block text-xs text-slate-400 mb-1.5">Name <span class="text-red-400">*</span></label>
+        <input id="bc-name" type="text" placeholder="e.g. June Promo — Unlimited Plan"
+               class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500">
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-xs text-slate-400 mb-1.5">Subscriber List <span class="text-red-400">*</span></label>
+        <select id="bc-list" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500">
+          <option value="">— Choose a list —</option>
+          {% for lst in lists %}
+          <option value="{{ lst.id }}">{{ lst.name }} ({{ lst.active_count() }} active)</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-xs text-slate-400 mb-1.5">Message <span class="text-red-400">*</span></label>
+        <textarea id="bc-body" rows="4"
+                  placeholder="Hi! You're getting exclusive access to our Unlimited plan for just $29/mo. Reply STOP to unsubscribe."
+                  class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+        <p class="text-xs text-slate-500 mt-1">
+          <span id="bc-char-count">0</span>/160 chars · 1 segment.
+          <span class="text-amber-400">Always include opt-out instructions (e.g. "Reply STOP").</span>
+        </p>
+      </div>
+
+      <div class="mb-6">
+        <label class="block text-xs text-slate-400 mb-1.5">Schedule (optional)</label>
+        <input id="bc-sched" type="datetime-local"
+               class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500">
+        <p class="text-xs text-slate-500 mt-1">Leave blank to save as draft. Hit "Send now" when ready, or schedule for auto-fire.</p>
+      </div>
+
+      <div class="flex gap-3 justify-end">
+        <button @click="showNew = false" class="text-sm text-slate-400 hover:text-white px-4 py-2 rounded-lg transition">Cancel</button>
+        <button @click="createBroadcast()"
+                class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition">
+          Save Broadcast
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function broadcastManager() {
+  return {
+    showNew: false,
+    createBroadcast() {
+      const name     = document.getElementById('bc-name').value.trim();
+      const list_id  = document.getElementById('bc-list').value;
+      const body     = document.getElementById('bc-body').value.trim();
+      const schedRaw = document.getElementById('bc-sched').value;
+      if (!name || !list_id || !body) { alert('Name, list, and message are required.'); return; }
+
+      // Convert local datetime to ISO string
+      const scheduled_at = schedRaw ? new Date(schedRaw).toISOString() : '';
+
+      fetch('/console/api/broadcasts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name, list_id: parseInt(list_id), body, scheduled_at })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { alert(data.error); return; }
+        this.showNew = false;
+        location.reload();
+      });
+    }
+  };
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const ta = document.getElementById('bc-body');
+  const cc = document.getElementById('bc-char-count');
+  if (ta && cc) {
+    ta.addEventListener('input', () => {
+      const n = ta.value.length;
+      cc.textContent = n;
+      cc.className = n > 160 ? 'text-red-400' : n > 140 ? 'text-amber-400' : '';
+    });
+  }
+});
+
+function sendNow(id) {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  fetch(`/console/api/broadcasts/${id}/send`, { method: 'POST' })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) { alert(data.error); btn.disabled = false; btn.textContent = 'Send now'; return; }
+    const statusEl = document.getElementById(`bc-status-${id}`);
+    if (statusEl) {
+      statusEl.textContent = 'sent';
+      statusEl.className = 'text-xs px-2.5 py-1 rounded-full font-medium bg-emerald-900/40 text-emerald-300';
+    }
+    btn.parentElement.innerHTML = `<span class="text-xs text-emerald-400">✓ ${data.sent} sent${data.failed ? `, ${data.failed} failed` : ''}</span>`;
+  })
+  .catch(() => { btn.disabled = false; btn.textContent = 'Send now'; });
+}
+
+function deleteBroadcast(id) {
+  if (!confirm('Delete this broadcast?')) return;
+  fetch(`/console/api/broadcasts/${id}`, { method: 'DELETE' })
+  .then(() => {
+    const row = document.getElementById(`bc-row-${id}`);
+    if (row) row.remove();
+  });
+}
+</script>
+{% endblock %}

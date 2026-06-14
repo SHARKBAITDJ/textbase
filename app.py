@@ -66,10 +66,13 @@ class Account(db.Model):
     status     = db.Column(db.String(20), default='active')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    messages = db.relationship('Message',     backref='account', lazy='dynamic')
-    api_keys = db.relationship('ApiKey',      backref='account', lazy='dynamic')
-    numbers  = db.relationship('PhoneNumber', backref='account', lazy='dynamic')
-    keywords = db.relationship('Keyword',     backref='account', lazy='dynamic')
+    messages    = db.relationship('Message',        backref='account', lazy='dynamic')
+    api_keys    = db.relationship('ApiKey',         backref='account', lazy='dynamic')
+    numbers     = db.relationship('PhoneNumber',    backref='account', lazy='dynamic')
+    keywords    = db.relationship('Keyword',        backref='account', lazy='dynamic')
+    sub_lists   = db.relationship('SubscriberList', backref='account', lazy='dynamic')
+    subscribers = db.relationship('Subscriber',     backref='account', lazy='dynamic')
+    broadcasts  = db.relationship('Broadcast',      backref='account', lazy='dynamic')
 
     def to_dict(self):
         return {
@@ -194,6 +197,126 @@ class Keyword(db.Model):
         }
 
 
+class SubscriberList(db.Model):
+    """A named group of phone numbers that can receive broadcasts."""
+    id          = db.Column(db.Integer, primary_key=True)
+    account_id  = db.Column(db.Integer, db.ForeignKey('account.id'))
+    name        = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(500), default='')
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+
+    subscribers = db.relationship('Subscriber', backref='subscriber_list',
+                                  lazy='dynamic', cascade='all, delete-orphan')
+    broadcasts  = db.relationship('Broadcast',  backref='subscriber_list', lazy='dynamic')
+
+    def active_count(self):
+        return self.subscribers.filter_by(status='active').count()
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'total': self.subscribers.count(),
+            'active': self.active_count(),
+            'created_at': self.created_at.strftime('%Y-%m-%d'),
+        }
+
+
+class Subscriber(db.Model):
+    """A phone number subscribed to a list."""
+    id         = db.Column(db.Integer, primary_key=True)
+    account_id = db.Column(db.Integer, db.ForeignKey('account.id'))
+    list_id    = db.Column(db.Integer, db.ForeignKey('subscriber_list.id'))
+    phone      = db.Column(db.String(30), nullable=False)
+    name       = db.Column(db.String(100), default='')
+    carrier    = db.Column(db.String(30))
+    status     = db.Column(db.String(20), default='active')  # active | opted_out
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('list_id', 'phone', name='uq_sub_list_phone'),)
+
+    def carrier_label(self):
+        return CARRIER_GATEWAYS.get(self.carrier, ('Unknown',))[0] if self.carrier else '—'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'phone': self.phone,
+            'name': self.name,
+            'carrier': self.carrier,
+            'carrier_label': self.carrier_label(),
+            'status': self.status,
+            'created_at': self.created_at.strftime('%Y-%m-%d'),
+        }
+
+
+class Broadcast(db.Model):
+    """A message sent (or scheduled to send) to all active subscribers in a list."""
+    id           = db.Column(db.Integer, primary_key=True)
+    account_id   = db.Column(db.Integer, db.ForeignKey('account.id'))
+    list_id      = db.Column(db.Integer, db.ForeignKey('subscriber_list.id'))
+    name         = db.Column(db.String(200), nullable=False)
+    body         = db.Column(db.Text, nullable=False)
+    status       = db.Column(db.String(20), default='draft')
+    # draft | scheduled | sending | sent | failed
+    scheduled_at = db.Column(db.DateTime)          # None → send immediately when triggered
+    sent_at      = db.Column(db.DateTime)
+    sent_count   = db.Column(db.Integer, default=0)
+    failed_count = db.Column(db.Integer, default=0)
+    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'body': self.body,
+            'list_id': self.list_id,
+            'list_name': self.subscriber_list.name if self.subscriber_list else '',
+            'status': self.status,
+            'scheduled_at': self.scheduled_at.strftime('%Y-%m-%d %H:%M') if self.scheduled_at else None,
+            'sent_at': self.sent_at.strftime('%Y-%m-%d %H:%M') if self.sent_at else None,
+            'sent_count': self.sent_count,
+            'failed_count': self.failed_count,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M'),
+        }
+
+
+def _execute_broadcast(broadcast: 'Broadcast'):
+    """Send a broadcast to all active subscribers. Called synchronously."""
+    broadcast.status = 'sending'
+    db.session.commit()
+
+    subs = Subscriber.query.filter_by(list_id=broadcast.list_id, status='active').all()
+    sent = failed = 0
+    for sub in subs:
+        result = send_sms_gateway(sub.phone, sub.carrier, broadcast.body)
+        if result.get('success'):
+            sent += 1
+        else:
+            failed += 1
+        # Log each message
+        msg = Message(
+            sid='SM' + secrets.token_hex(16),
+            account_id=broadcast.account_id,
+            from_num='Broadcast',
+            to_num=sub.phone,
+            body=broadcast.body,
+            carrier=sub.carrier,
+            direction='outbound-api',
+            status='sent' if result.get('success') else 'failed',
+            error_msg=result.get('error') if not result.get('success') else None,
+        )
+        db.session.add(msg)
+
+    broadcast.sent_count   = sent
+    broadcast.failed_count = failed
+    broadcast.status       = 'sent'
+    broadcast.sent_at      = datetime.utcnow()
+    db.session.commit()
+    return sent, failed
+
+
 # ── Bootstrap: auto-create default account ─────────────────────────────────────
 
 def get_or_create_account():
@@ -314,11 +437,13 @@ def index():
 def console_dashboard():
     acct = get_or_create_account()
     stats = {
-        'total':     Message.query.filter_by(account_id=acct.id).count(),
-        'sent':      Message.query.filter_by(account_id=acct.id, status='sent').count(),
-        'failed':    Message.query.filter_by(account_id=acct.id, status='failed').count(),
-        'numbers':   PhoneNumber.query.filter_by(account_id=acct.id, status='active').count(),
-        'api_keys':  ApiKey.query.filter_by(account_id=acct.id, status='active').count(),
+        'total':       Message.query.filter_by(account_id=acct.id).count(),
+        'sent':        Message.query.filter_by(account_id=acct.id, status='sent').count(),
+        'failed':      Message.query.filter_by(account_id=acct.id, status='failed').count(),
+        'numbers':     PhoneNumber.query.filter_by(account_id=acct.id, status='active').count(),
+        'api_keys':    ApiKey.query.filter_by(account_id=acct.id, status='active').count(),
+        'subscribers': Subscriber.query.filter_by(account_id=acct.id, status='active').count(),
+        'broadcasts':  Broadcast.query.filter_by(account_id=acct.id).count(),
     }
     recent = Message.query.filter_by(account_id=acct.id)\
                           .order_by(Message.sent_at.desc()).limit(10).all()
@@ -714,6 +839,192 @@ def console_send_test():
     db.session.commit()
     return jsonify(status=msg.status, sandbox=result.get('sandbox', False),
                    error=result.get('error'))
+
+
+# ── Subscribers console page ───────────────────────────────────────────────────
+
+@app.route('/console/subscribers')
+def console_subscribers():
+    acct  = get_or_create_account()
+    lists = SubscriberList.query.filter_by(account_id=acct.id)\
+                                .order_by(SubscriberList.created_at.desc()).all()
+    list_id = request.args.get('list', type=int)
+    selected_list = SubscriberList.query.get(list_id) if list_id else (lists[0] if lists else None)
+    subs = selected_list.subscribers.order_by(Subscriber.created_at.desc()).all() if selected_list else []
+    return render_template('console/subscribers.html',
+                           lists=lists, selected_list=selected_list,
+                           subs=subs, active_nav='subscribers')
+
+@app.route('/console/api/lists', methods=['POST'])
+def console_create_list():
+    acct = get_or_create_account()
+    data = request.get_json(force=True) or {}
+    name = data.get('name', '').strip()
+    if not name:
+        return jsonify(error='Name required'), 400
+    lst = SubscriberList(account_id=acct.id, name=name,
+                         description=data.get('description', ''))
+    db.session.add(lst)
+    db.session.commit()
+    return jsonify(lst.to_dict()), 201
+
+@app.route('/console/api/lists/<int:lid>', methods=['DELETE'])
+def console_delete_list(lid):
+    lst = SubscriberList.query.get_or_404(lid)
+    db.session.delete(lst)
+    db.session.commit()
+    return jsonify(message='Deleted')
+
+@app.route('/console/api/lists/<int:lid>/subscribers', methods=['POST'])
+def console_add_subscriber(lid):
+    lst  = SubscriberList.query.get_or_404(lid)
+    data = request.get_json(force=True) or {}
+    phone = normalize_phone(data.get('phone', '').strip())
+    if not phone:
+        return jsonify(error='Phone number required'), 400
+    carrier = data.get('carrier', '').strip() or None
+    existing = Subscriber.query.filter_by(list_id=lid, phone=phone).first()
+    if existing:
+        # Re-activate if they were opted out
+        if existing.status == 'opted_out':
+            existing.status = 'active'
+            db.session.commit()
+            return jsonify(existing.to_dict())
+        return jsonify(error='Already subscribed'), 409
+    sub = Subscriber(
+        account_id=lst.account_id,
+        list_id=lid,
+        phone=phone,
+        name=data.get('name', '').strip(),
+        carrier=carrier,
+    )
+    db.session.add(sub)
+    db.session.commit()
+    return jsonify(sub.to_dict()), 201
+
+@app.route('/console/api/lists/<int:lid>/subscribers/import', methods=['POST'])
+def console_import_subscribers(lid):
+    """Bulk import: expects JSON { subscribers: [{phone, name, carrier}] }"""
+    lst  = SubscriberList.query.get_or_404(lid)
+    data = request.get_json(force=True) or {}
+    rows = data.get('subscribers', [])
+    added = skipped = 0
+    for row in rows:
+        phone = normalize_phone(str(row.get('phone', '')).strip())
+        if not phone:
+            skipped += 1
+            continue
+        existing = Subscriber.query.filter_by(list_id=lid, phone=phone).first()
+        if existing:
+            skipped += 1
+            continue
+        sub = Subscriber(
+            account_id=lst.account_id,
+            list_id=lid,
+            phone=phone,
+            name=str(row.get('name', '')).strip(),
+            carrier=str(row.get('carrier', '')).strip() or None,
+        )
+        db.session.add(sub)
+        added += 1
+    db.session.commit()
+    return jsonify(added=added, skipped=skipped)
+
+@app.route('/console/api/subscribers/<int:sid_>', methods=['DELETE'])
+def console_remove_subscriber(sid_):
+    sub = Subscriber.query.get_or_404(sid_)
+    db.session.delete(sub)
+    db.session.commit()
+    return jsonify(message='Removed')
+
+@app.route('/console/api/subscribers/<int:sid_>/optout', methods=['POST'])
+def console_optout_subscriber(sid_):
+    sub = Subscriber.query.get_or_404(sid_)
+    sub.status = 'opted_out'
+    db.session.commit()
+    return jsonify(message='Opted out')
+
+
+# ── Broadcasts console page ─────────────────────────────────────────────────────
+
+@app.route('/console/broadcasts')
+def console_broadcasts():
+    acct       = get_or_create_account()
+    broadcasts = Broadcast.query.filter_by(account_id=acct.id)\
+                                .order_by(Broadcast.created_at.desc()).all()
+    lists      = SubscriberList.query.filter_by(account_id=acct.id).all()
+    return render_template('console/broadcasts.html',
+                           broadcasts=broadcasts, lists=lists, active_nav='broadcasts')
+
+@app.route('/console/api/broadcasts', methods=['POST'])
+def console_create_broadcast():
+    acct = get_or_create_account()
+    data = request.get_json(force=True) or {}
+    name    = data.get('name', '').strip()
+    body    = data.get('body', '').strip()
+    list_id = data.get('list_id')
+    sched   = data.get('scheduled_at', '').strip()  # ISO datetime string or empty
+
+    if not name:   return jsonify(error='Name required'), 400
+    if not body:   return jsonify(error='Message body required'), 400
+    if not list_id: return jsonify(error='Subscriber list required'), 400
+
+    lst = SubscriberList.query.get(list_id)
+    if not lst or lst.account_id != acct.id:
+        return jsonify(error='List not found'), 404
+
+    scheduled_at = None
+    if sched:
+        try:
+            scheduled_at = datetime.fromisoformat(sched)
+        except ValueError:
+            return jsonify(error='Invalid scheduled_at format (use ISO 8601)'), 400
+
+    bc = Broadcast(
+        account_id=acct.id,
+        list_id=list_id,
+        name=name,
+        body=body,
+        status='scheduled' if scheduled_at else 'draft',
+        scheduled_at=scheduled_at,
+    )
+    db.session.add(bc)
+    db.session.commit()
+    return jsonify(bc.to_dict()), 201
+
+@app.route('/console/api/broadcasts/<int:bid>/send', methods=['POST'])
+def console_send_broadcast(bid):
+    bc = Broadcast.query.get_or_404(bid)
+    if bc.status in ('sent', 'sending'):
+        return jsonify(error='Already sent or sending'), 400
+    sent, failed = _execute_broadcast(bc)
+    return jsonify(status='sent', sent=sent, failed=failed)
+
+@app.route('/console/api/broadcasts/<int:bid>', methods=['DELETE'])
+def console_delete_broadcast(bid):
+    bc = Broadcast.query.get_or_404(bid)
+    if bc.status in ('sent', 'sending'):
+        return jsonify(error='Cannot delete a sent broadcast'), 400
+    db.session.delete(bc)
+    db.session.commit()
+    return jsonify(message='Deleted')
+
+@app.route('/run-scheduled')
+def run_scheduled_broadcasts():
+    """
+    Hit this endpoint on a schedule (e.g. UptimeRobot every 5 min, cron-job.org)
+    to auto-fire broadcasts whose scheduled_at has passed.
+    """
+    now        = datetime.utcnow()
+    pending    = Broadcast.query.filter(
+        Broadcast.status == 'scheduled',
+        Broadcast.scheduled_at <= now
+    ).all()
+    results = []
+    for bc in pending:
+        sent, failed = _execute_broadcast(bc)
+        results.append({'id': bc.id, 'name': bc.name, 'sent': sent, 'failed': failed})
+    return jsonify(processed=len(results), broadcasts=results)
 
 
 # ── Keywords console page ──────────────────────────────────────────────────────
