@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block title %}Keywords — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-8" x-data="keywordManager()">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Keyword Auto-Responders</h1>
+      <p class="text-slate-400 mt-1 text-sm">
+        When someone texts a keyword to your number, TextBase replies automatically.
+        Perfect for JOIN, STOP, HELP, UNLIMITED, INFO — any word you choose.
+      </p>
+    </div>
+    <button @click="showAdd = true"
+            class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      Add Keyword
+    </button>
+  </div>
+
+  <!-- How it works banner -->
+  <div class="bg-indigo-900/30 border border-indigo-700/40 rounded-xl p-4 mb-8 flex gap-3">
+    <svg class="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <div class="text-sm text-indigo-200">
+      <strong>How it works:</strong> When TextBase receives an inbound SMS at
+      <code class="bg-indigo-800/50 px-1.5 py-0.5 rounded text-xs">/webhook/inbound</code>,
+      it checks the message body against your active keywords. The first match sends an
+      automatic reply back to the sender — instantly, for free.
+      <span class="text-indigo-400">· First match wins if multiple keywords could match.</span>
+    </div>
+  </div>
+
+  <!-- Keyword table -->
+  <div class="bg-slate-800/60 border border-slate-700/50 rounded-xl overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-900/50 text-slate-400 text-xs uppercase tracking-wider">
+        <tr>
+          <th class="text-left px-5 py-3.5">Keyword</th>
+          <th class="text-left px-5 py-3.5">Match</th>
+          <th class="text-left px-5 py-3.5">Auto-Reply</th>
+          <th class="text-left px-5 py-3.5">Matches</th>
+          <th class="text-left px-5 py-3.5">Status</th>
+          <th class="px-5 py-3.5"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-700/40">
+        {% for kw in keywords %}
+        <tr class="hover:bg-slate-700/20 transition" id="kw-row-{{ kw.id }}">
+          <td class="px-5 py-4">
+            <span class="font-mono font-bold text-indigo-300 tracking-wide text-base">{{ kw.keyword }}</span>
+          </td>
+          <td class="px-5 py-4">
+            <span class="text-xs px-2 py-1 rounded-full font-medium
+              {% if kw.match_type == 'exact' %}bg-slate-700 text-slate-300
+              {% elif kw.match_type == 'startswith' %}bg-violet-900/50 text-violet-300
+              {% else %}bg-amber-900/40 text-amber-300{% endif %}">
+              {{ kw.match_type }}
+            </span>
+          </td>
+          <td class="px-5 py-4 text-slate-300 max-w-xs">
+            <span class="truncate block" title="{{ kw.response }}">{{ kw.response }}</span>
+          </td>
+          <td class="px-5 py-4 text-slate-400 font-mono">{{ kw.match_count }}</td>
+          <td class="px-5 py-4">
+            <button onclick="toggleKeyword({{ kw.id }}, {{ 'true' if kw.active else 'false' }})"
+                    id="toggle-{{ kw.id }}"
+                    class="text-xs px-2.5 py-1 rounded-full font-medium transition
+                      {{ 'bg-emerald-900/50 text-emerald-300 hover:bg-emerald-800/60' if kw.active else 'bg-slate-700 text-slate-500 hover:bg-slate-600' }}">
+              {{ 'Active' if kw.active else 'Paused' }}
+            </button>
+          </td>
+          <td class="px-5 py-4 text-right">
+            <button onclick="deleteKeyword({{ kw.id }})"
+                    class="text-slate-500 hover:text-red-400 transition p-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="px-5 py-12 text-center text-slate-500">
+            <div class="flex flex-col items-center gap-3">
+              <svg class="w-10 h-10 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                      d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+              </svg>
+              <p class="text-sm">No keywords yet. Add your first one above.</p>
+              <p class="text-xs text-slate-600">Try: STOP, JOIN, HELP, UNLIMITED, INFO</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Common keyword presets -->
+  <div class="mt-8">
+    <p class="text-xs text-slate-500 uppercase tracking-wider mb-3">Quick-add common keywords</p>
+    <div class="flex flex-wrap gap-2">
+      {% set presets = [
+        ('STOP',      'You have been unsubscribed. You will receive no more messages.',        'exact'),
+        ('UNSTOP',    'You have been re-subscribed. Welcome back!',                            'exact'),
+        ('HELP',      'For support, visit our website or reply STOP to unsubscribe.',          'exact'),
+        ('JOIN',      'Welcome! You have been subscribed. Reply STOP to unsubscribe anytime.', 'exact'),
+        ('UNLIMITED', 'Thanks for your interest in our Unlimited plan! Reply INFO for details.','exact'),
+        ('INFO',      'Learn more at our website. Reply STOP to unsubscribe.',                 'exact'),
+      ] %}
+      {% for word, resp, mtype in presets %}
+      <button onclick="quickAdd('{{ word }}', `{{ resp }}`, '{{ mtype }}')"
+              class="text-xs bg-slate-700/50 hover:bg-indigo-800/50 border border-slate-600/50 hover:border-indigo-600/50
+                     text-slate-300 hover:text-indigo-300 px-3 py-1.5 rounded-lg transition font-mono">
+        + {{ word }}
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Add keyword modal -->
+  <div x-show="showAdd" x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+       @keydown.escape.window="showAdd = false">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6"
+         @click.stop>
+      <h2 class="text-lg font-bold text-white mb-5">Add Keyword</h2>
+      <form id="add-kw-form" @submit.prevent="submitKeyword">
+
+        <div class="mb-4">
+          <label class="block text-xs text-slate-400 mb-1.5">Keyword <span class="text-red-400">*</span></label>
+          <input id="kw-word" type="text" placeholder="e.g. UNLIMITED"
+                 class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm
+                        font-mono uppercase focus:outline-none focus:border-indigo-500"
+                 required>
+          <p class="text-xs text-slate-500 mt-1">Saved uppercase automatically. Case-insensitive matching.</p>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-xs text-slate-400 mb-1.5">Match type</label>
+          <select id="kw-match" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5
+                                       text-white text-sm focus:outline-none focus:border-indigo-500">
+            <option value="exact">Exact — message must equal keyword</option>
+            <option value="startswith">Starts with — message begins with keyword</option>
+            <option value="contains">Contains — keyword appears anywhere in message</option>
+          </select>
+        </div>
+
+        <div class="mb-6">
+          <label class="block text-xs text-slate-400 mb-1.5">Auto-reply message <span class="text-red-400">*</span></label>
+          <textarea id="kw-response" rows="3" placeholder="Thanks for texting UNLIMITED! Here's what you get…"
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm
+                           focus:outline-none focus:border-indigo-500 resize-none"
+                    required></textarea>
+          <p class="text-xs text-slate-500 mt-1">Max 160 chars to stay in one segment. <span id="kw-char-count" class="text-slate-400">0</span>/160</p>
+        </div>
+
+        <div class="flex gap-3 justify-end">
+          <button type="button" @click="showAdd = false"
+                  class="text-sm text-slate-400 hover:text-white px-4 py-2 rounded-lg transition">
+            Cancel
+          </button>
+          <button type="submit"
+                  class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition">
+            Save Keyword
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function keywordManager() {
+  return {
+    showAdd: false,
+    submitKeyword() {
+      const word  = document.getElementById('kw-word').value.trim();
+      const match = document.getElementById('kw-match').value;
+      const resp  = document.getElementById('kw-response').value.trim();
+      if (!word || !resp) return;
+      fetch('/console/api/keywords', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ keyword: word, match_type: match, response: resp })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { alert(data.error); return; }
+        this.showAdd = false;
+        location.reload();
+      });
+    }
+  };
+}
+
+// Character counter
+document.addEventListener('DOMContentLoaded', () => {
+  const ta = document.getElementById('kw-response');
+  const cc = document.getElementById('kw-char-count');
+  if (ta && cc) {
+    ta.addEventListener('input', () => {
+      const n = ta.value.length;
+      cc.textContent = n;
+      cc.className = n > 160 ? 'text-red-400' : n > 140 ? 'text-amber-400' : 'text-slate-400';
+    });
+  }
+});
+
+function toggleKeyword(id, currentActive) {
+  fetch(`/console/api/keywords/${id}/toggle`, { method: 'POST' })
+  .then(r => r.json())
+  .then(data => {
+    const btn = document.getElementById(`toggle-${id}`);
+    if (data.active) {
+      btn.textContent = 'Active';
+      btn.className = 'text-xs px-2.5 py-1 rounded-full font-medium transition bg-emerald-900/50 text-emerald-300 hover:bg-emerald-800/60';
+    } else {
+      btn.textContent = 'Paused';
+      btn.className = 'text-xs px-2.5 py-1 rounded-full font-medium transition bg-slate-700 text-slate-500 hover:bg-slate-600';
+    }
+  });
+}
+
+function deleteKeyword(id) {
+  if (!confirm('Delete this keyword?')) return;
+  fetch(`/console/api/keywords/${id}`, { method: 'DELETE' })
+  .then(() => {
+    const row = document.getElementById(`kw-row-${id}`);
+    if (row) row.remove();
+  });
+}
+
+function quickAdd(word, response, matchType) {
+  document.getElementById('kw-word').value     = word;
+  document.getElementById('kw-response').value = response;
+  document.getElementById('kw-match').value    = matchType;
+  const cc = document.getElementById('kw-char-count');
+  if (cc) cc.textContent = response.length;
+  // trigger Alpine showAdd
+  document.querySelector('[x-data]').__x.$data.showAdd = true;
+}
+</script>
+{% endblock %}

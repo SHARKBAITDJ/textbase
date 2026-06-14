@@ -28,13 +28,13 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
 db = SQLAlchemy(app)
 
-# ── Config ──────────────────────────────────────────────────────────────────────────────────
+# ── Config ─────────────────────────────────────────────────────────────────────
 SMTP_HOST = os.getenv('SMTP_HOST', 'smtp.gmail.com')
 SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
 SMTP_USER = os.getenv('SMTP_USER', '')
 SMTP_PASS = os.getenv('SMTP_PASSWORD', '')
 APP_NAME  = os.getenv('APP_NAME', 'TextBase')
-CONSOLE_PASSWORD = os.getenv('CONSOLE_PASSWORD', '')
+CONSOLE_PASSWORD = os.getenv('CONSOLE_PASSWORD', '')   # optional admin console password
 MODE      = 'live' if (SMTP_USER and SMTP_PASS) else 'sandbox'
 
 CARRIER_GATEWAYS = {
@@ -56,7 +56,7 @@ CARRIER_GATEWAYS = {
 }
 
 
-# ── Models ──────────────────────────────────────────────────────────────────────────────────
+# ── Models ─────────────────────────────────────────────────────────────────────
 
 class Account(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
@@ -69,6 +69,7 @@ class Account(db.Model):
     messages = db.relationship('Message',     backref='account', lazy='dynamic')
     api_keys = db.relationship('ApiKey',      backref='account', lazy='dynamic')
     numbers  = db.relationship('PhoneNumber', backref='account', lazy='dynamic')
+    keywords = db.relationship('Keyword',     backref='account', lazy='dynamic')
 
     def to_dict(self):
         return {
@@ -87,19 +88,16 @@ class PhoneNumber(db.Model):
     number        = db.Column(db.String(30), unique=True, nullable=False)
     friendly_name = db.Column(db.String(100))
     carrier       = db.Column(db.String(30))
-    sms_url       = db.Column(db.String(500))
+    sms_url       = db.Column(db.String(500))   # inbound webhook URL
     status        = db.Column(db.String(20), default='active')
     created_at    = db.Column(db.DateTime, default=datetime.utcnow)
-
-    def carrier_label(self):
-        return CARRIER_GATEWAYS.get(self.carrier, ('Unknown',))[0] if self.carrier else 'Unknown'
 
     def to_dict(self):
         return {
             'phone_number': self.number,
             'friendly_name': self.friendly_name or self.number,
             'carrier': self.carrier,
-            'carrier_label': self.carrier_label(),
+            'carrier_label': CARRIER_GATEWAYS.get(self.carrier, ('Unknown',))[0] if self.carrier else 'Unknown',
             'sms_url': self.sms_url,
             'status': self.status,
         }
@@ -114,7 +112,7 @@ class Message(db.Model):
     body         = db.Column(db.Text)
     carrier      = db.Column(db.String(30))
     direction    = db.Column(db.String(20), default='outbound-api')
-    status       = db.Column(db.String(20), default='queued')
+    status       = db.Column(db.String(20), default='queued')  # queued | sent | failed | undelivered
     error_code   = db.Column(db.String(10))
     error_msg    = db.Column(db.Text)
     num_segments = db.Column(db.Integer, default=1)
@@ -153,8 +151,50 @@ class ApiKey(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
-# ── Bootstrap ─────────────────────────────────────────────────────────────────────────────────
-from typing import Optional
+class Keyword(db.Model):
+    """
+    Keyword auto-responder.
+    When an inbound message body matches `keyword`, TextBase immediately
+    sends `response` back to the sender via the carrier gateway.
+
+    match_type:
+      exact      — body must equal keyword (case-insensitive)
+      contains   — body must contain keyword anywhere
+      startswith — body must start with keyword
+    """
+    id          = db.Column(db.Integer, primary_key=True)
+    account_id  = db.Column(db.Integer, db.ForeignKey('account.id'))
+    keyword     = db.Column(db.String(100), nullable=False)
+    response    = db.Column(db.Text, nullable=False)
+    match_type  = db.Column(db.String(20), default='exact')   # exact | contains | startswith
+    active      = db.Column(db.Boolean, default=True)
+    match_count = db.Column(db.Integer, default=0)
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def matches(self, body: str) -> bool:
+        b = body.strip().lower()
+        k = self.keyword.strip().lower()
+        if self.match_type == 'exact':
+            return b == k
+        if self.match_type == 'startswith':
+            return b.startswith(k)
+        if self.match_type == 'contains':
+            return k in b
+        return False
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'keyword': self.keyword,
+            'response': self.response,
+            'match_type': self.match_type,
+            'active': self.active,
+            'match_count': self.match_count,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M'),
+        }
+
+
+# ── Bootstrap: auto-create default account ─────────────────────────────────────
 
 def get_or_create_account():
     acct = Account.query.first()
@@ -165,13 +205,15 @@ def get_or_create_account():
             name='My Account',
         )
         db.session.add(acct)
+        # Create a default API key
         key = ApiKey(key='sk_' + secrets.token_urlsafe(32), name='Default Key')
         acct.api_keys.append(key)
         db.session.commit()
     return acct
 
 
-# ── SMS delivery ─────────────────────────────────────────────────────────────────────────────────
+# ── SMS delivery ───────────────────────────────────────────────────────────────
+
 def normalize_phone(raw: str) -> str:
     digits = re.sub(r'[^0-9]', '', raw.strip())
     if len(digits) == 10:
@@ -179,7 +221,7 @@ def normalize_phone(raw: str) -> str:
     return digits
 
 
-def send_sms_gateway(to: str, carrier: Optional[str], body: str) -> dict:
+def send_sms_gateway(to: str, carrier: str | None, body: str) -> dict:
     digits  = normalize_phone(to)
     gateway = CARRIER_GATEWAYS.get(carrier or '')[1] if carrier else None
 
@@ -208,8 +250,10 @@ def send_sms_gateway(to: str, carrier: Optional[str], body: str) -> dict:
         return {'success': False, 'error': str(e)}
 
 
-# ── Auth helpers ────────────────────────────────────────────────────────────────────────────────
+# ── Auth helpers ───────────────────────────────────────────────────────────────
+
 def require_api_key(f):
+    """Authenticate via X-Api-Key header or ?api_key= param."""
     @wraps(f)
     def decorated(*args, **kwargs):
         key_val = (request.headers.get('X-Api-Key') or
@@ -228,6 +272,7 @@ def require_api_key(f):
 
 
 def require_basic_auth(account_sid):
+    """Validate HTTP Basic auth for Twilio-compatible endpoints."""
     auth = request.headers.get('Authorization', '')
     if not auth.startswith('Basic '):
         return None
@@ -242,7 +287,8 @@ def require_basic_auth(account_sid):
     return acct
 
 
-# ── Template context ─────────────────────────────────────────────────────────────────────────────
+# ── Template context ───────────────────────────────────────────────────────────
+
 @app.context_processor
 def inject_globals():
     acct = Account.query.first()
@@ -321,7 +367,7 @@ def console_settings():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# NATIVE REST API
+# NATIVE REST API  (/api/v1/...)
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.route('/api/v1/messages', methods=['POST'])
@@ -337,6 +383,7 @@ def api_send_message():
     if not body: return jsonify(error='body is required'), 400
     if len(body) > 1600: return jsonify(error='body exceeds 1600 characters'), 400
 
+    # Auto-detect carrier from registered numbers
     if not carrier:
         num = PhoneNumber.query.filter_by(account_id=g.account.id, number=normalize_phone(to)).first()
         if num and num.carrier:
@@ -435,7 +482,7 @@ def api_revoke_key(kid):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TWILIO-COMPATIBLE API
+# TWILIO-COMPATIBLE API  (/2010-04-01/...)
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.route('/2010-04-01/Accounts/<account_sid>/Messages.json', methods=['POST'])
@@ -447,11 +494,12 @@ def twilio_send_message(account_sid):
     to      = (request.form.get('To')   or '').strip()
     from_   = (request.form.get('From') or '').strip()
     body    = (request.form.get('Body') or '').strip()
-    carrier = (request.form.get('Carrier') or '').strip() or None
+    carrier = (request.form.get('Carrier') or '').strip() or None  # TextBase extension
 
     if not to:   return jsonify(code=21201, message="'To' is required", status=400), 400
     if not body: return jsonify(code=21602, message="'Body' is required", status=400), 400
 
+    # Auto-detect carrier from registered numbers
     if not carrier:
         num = PhoneNumber.query.filter_by(account_id=acct.id, number=normalize_phone(to)).first()
         if num and num.carrier:
@@ -477,6 +525,7 @@ def twilio_send_message(account_sid):
         msg.error_msg  = result.get('error', 'Delivery failed')
         msg.error_code = '30007'
     db.session.commit()
+
     return jsonify(msg.to_dict()), 201
 
 
@@ -511,11 +560,12 @@ def twilio_get_account(account_sid):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# INBOUND WEBHOOK
+# INBOUND WEBHOOK  (/webhook/inbound)
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.route('/webhook/inbound', methods=['POST', 'GET'])
 def webhook_inbound():
+    """Receives inbound SMS from any provider and stores it, then forwards to number's sms_url."""
     if request.is_json:
         d     = request.get_json() or {}
         from_ = d.get('From', d.get('from', ''))
@@ -541,6 +591,21 @@ def webhook_inbound():
         db.session.add(msg)
         db.session.commit()
 
+    # Keyword auto-responder
+    if acct and body:
+        keywords = Keyword.query.filter_by(account_id=acct.id, active=True).all()
+        for kw in keywords:
+            if kw.matches(body):
+                kw.match_count += 1
+                db.session.commit()
+                # Auto-reply: detect sender's carrier from registered numbers, else best-effort
+                sender_num = normalize_phone(from_)
+                sender_rec = PhoneNumber.query.filter_by(account_id=acct.id, number=sender_num).first()
+                sender_carrier = sender_rec.carrier if sender_rec else None
+                send_sms_gateway(from_, sender_carrier, kw.response)
+                break   # first match wins
+
+    # Look up number and forward to its webhook
     to_num = request.form.get('To', '') or request.args.get('To', '')
     num = PhoneNumber.query.filter_by(number=normalize_phone(to_num)).first() if to_num else None
     if num and num.sms_url:
@@ -555,7 +620,7 @@ def webhook_inbound():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# CONSOLE REST ENDPOINTS
+# CONSOLE REST ENDPOINTS (used by JS in admin pages)
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.route('/console/api/numbers', methods=['POST'])
@@ -651,13 +716,74 @@ def console_send_test():
                    error=result.get('error'))
 
 
+# ── Keywords console page ──────────────────────────────────────────────────────
+
+@app.route('/console/keywords')
+def console_keywords():
+    acct     = get_or_create_account()
+    keywords = Keyword.query.filter_by(account_id=acct.id)\
+                            .order_by(Keyword.created_at.desc()).all()
+    return render_template('console/keywords.html', keywords=keywords, active_nav='keywords')
+
+
+# ── Keywords console API ────────────────────────────────────────────────────────
+
+@app.route('/console/api/keywords', methods=['POST'])
+def console_create_keyword():
+    acct = get_or_create_account()
+    data = request.get_json(force=True) or {}
+    word = data.get('keyword', '').strip().upper()
+    resp = data.get('response', '').strip()
+    mtype = data.get('match_type', 'exact').strip()
+    if not word:
+        return jsonify(error='Keyword is required'), 400
+    if not resp:
+        return jsonify(error='Response message is required'), 400
+    if mtype not in ('exact', 'contains', 'startswith'):
+        return jsonify(error='Invalid match_type'), 400
+    kw = Keyword(
+        account_id=acct.id,
+        keyword=word,
+        response=resp,
+        match_type=mtype,
+    )
+    db.session.add(kw)
+    db.session.commit()
+    return jsonify(kw.to_dict()), 201
+
+@app.route('/console/api/keywords/<int:kid>', methods=['PUT'])
+def console_update_keyword(kid):
+    kw   = Keyword.query.get_or_404(kid)
+    data = request.get_json(force=True) or {}
+    if 'keyword'    in data: kw.keyword    = data['keyword'].strip().upper()
+    if 'response'   in data: kw.response   = data['response'].strip()
+    if 'match_type' in data: kw.match_type = data['match_type'].strip()
+    if 'active'     in data: kw.active     = bool(data['active'])
+    db.session.commit()
+    return jsonify(kw.to_dict())
+
+@app.route('/console/api/keywords/<int:kid>', methods=['DELETE'])
+def console_delete_keyword(kid):
+    kw = Keyword.query.get_or_404(kid)
+    db.session.delete(kw)
+    db.session.commit()
+    return jsonify(message='Deleted')
+
+@app.route('/console/api/keywords/<int:kid>/toggle', methods=['POST'])
+def console_toggle_keyword(kid):
+    kw = Keyword.query.get_or_404(kid)
+    kw.active = not kw.active
+    db.session.commit()
+    return jsonify(active=kw.active)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # BOOTSTRAP
 # ══════════════════════════════════════════════════════════════════════════════
 
 with app.app_context():
     db.create_all()
-    get_or_create_account()
+    get_or_create_account()   # ensure default account exists
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
