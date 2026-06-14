@@ -38,21 +38,22 @@ CONSOLE_PASSWORD = os.getenv('CONSOLE_PASSWORD', '')   # optional admin console 
 MODE      = 'live' if (SMTP_USER and SMTP_PASS) else 'sandbox'
 
 CARRIER_GATEWAYS = {
-    'att':        ('AT&T',               'txt.att.net'),
-    'verizon':    ('Verizon',            'vtext.com'),
-    'tmobile':    ('T-Mobile',           'tmomail.net'),
-    'sprint':     ('Sprint',             'messaging.sprintpcs.com'),
-    'boost':      ('Boost Mobile',       'sms.myboostmobile.com'),
-    'cricket':    ('Cricket Wireless',   'sms.cricketwireless.net'),
-    'metro':      ('Metro by T-Mobile',  'mymetropcs.com'),
-    'uscellular': ('US Cellular',        'email.uscc.net'),
-    'virgin':     ('Virgin Mobile',      'vmobl.com'),
-    'mint':       ('Mint Mobile',        'tmomail.net'),
-    'google_fi':  ('Google Fi',          'msg.fi.google.com'),
-    'consumer':   ('Consumer Cellular',  'mailmymobile.net'),
-    'tracfone':   ('Tracfone',           'mmst5.tracfone.com'),
-    'republic':   ('Republic Wireless',  'text.republicwireless.com'),
-    'xfinity':    ('Xfinity Mobile',     'vtext.com'),
+    'att':          ('AT&T',               'txt.att.net'),
+    'verizon':      ('Verizon',            'vtext.com'),
+    'tmobile':      ('T-Mobile',           'tmomail.net'),
+    'sprint':       ('Sprint',             'messaging.sprintpcs.com'),
+    'boost':        ('Boost Mobile',       'sms.myboostmobile.com'),
+    'cricket':      ('Cricket Wireless',   'sms.cricketwireless.net'),
+    'metro':        ('Metro by T-Mobile',  'mymetropcs.com'),
+    'uscellular':   ('US Cellular',        'email.uscc.net'),
+    'virgin':       ('Virgin Mobile',      'vmobl.com'),
+    'mint':         ('Mint Mobile',        'tmomail.net'),
+    'google_voice': ('Google Voice',       'txt.voice.google.com'),   # ← free dedicated number
+    'google_fi':    ('Google Fi',          'msg.fi.google.com'),
+    'consumer':     ('Consumer Cellular',  'mailmymobile.net'),
+    'tracfone':     ('Tracfone',           'mmst5.tracfone.com'),
+    'republic':     ('Republic Wireless',  'text.republicwireless.com'),
+    'xfinity':      ('Xfinity Mobile',     'vtext.com'),
 }
 
 

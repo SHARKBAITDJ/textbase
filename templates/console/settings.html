@@ -1,36 +1,298 @@
 {% extends "base.html" %}
 {% block title %}Settings — {{ app_name }}{% endblock %}
 {% block topbar_title %}Settings{% endblock %}
+
 {% block content %}
 <div class="page" style="max-width:800px">
+
+  <!-- Account credentials -->
   <div class="card p-6 mb-6">
     <h2 class="font-semibold text-white mb-4">Account Credentials</h2>
     <div class="grid grid-cols-2 gap-4 mb-4">
-      <div><div class="text-xs font-medium mb-1.5" style="color:var(--muted)">Account SID</div><div class="flex items-center gap-2"><span class="font-mono text-sm px-3 py-2 rounded-lg flex-1 truncate" style="background:var(--surface);border:1px solid var(--border);color:#818cf8">{{ cfg.account_sid }}</span><button onclick="navigator.clipboard.writeText('{{ cfg.account_sid }}').then(()=>showToast('Copied!'))" class="btn-ghost" style="font-size:12px;padding:8px 12px;flex-shrink:0">Copy</button></div></div>
-      <div><div class="text-xs font-medium mb-1.5" style="color:var(--muted)">Auth Token</div><div class="flex items-center gap-2"><span class="font-mono text-sm px-3 py-2 rounded-lg flex-1 truncate" style="background:var(--surface);border:1px solid var(--border);color:#94a3b8">{{ cfg.auth_token[:10] }}••••••••••</span><button onclick="navigator.clipboard.writeText('{{ cfg.auth_token }}').then(()=>showToast('Copied!'))" class="btn-ghost" style="font-size:12px;padding:8px 12px;flex-shrink:0">Copy</button></div></div>
+      <div>
+        <div class="text-xs font-medium mb-1.5" style="color:var(--muted)">Account SID</div>
+        <div class="flex items-center gap-2">
+          <span class="font-mono text-sm px-3 py-2 rounded-lg flex-1 truncate" style="background:var(--surface);border:1px solid var(--border);color:#818cf8">{{ cfg.account_sid }}</span>
+          <button onclick="navigator.clipboard.writeText('{{ cfg.account_sid }}').then(()=>showToast('Copied!'))"
+                  class="btn-ghost" style="font-size:12px;padding:8px 12px;flex-shrink:0">Copy</button>
+        </div>
+      </div>
+      <div>
+        <div class="text-xs font-medium mb-1.5" style="color:var(--muted)">Auth Token</div>
+        <div class="flex items-center gap-2">
+          <span class="font-mono text-sm px-3 py-2 rounded-lg flex-1 truncate" style="background:var(--surface);border:1px solid var(--border);color:#94a3b8">{{ cfg.auth_token[:10] }}••••••••••••••••</span>
+          <button onclick="navigator.clipboard.writeText('{{ cfg.auth_token }}').then(()=>showToast('Copied!'))"
+                  class="btn-ghost" style="font-size:12px;padding:8px 12px;flex-shrink:0">Copy</button>
+        </div>
+      </div>
     </div>
-    <div><div class="text-xs font-medium mb-1.5" style="color:var(--muted)">API Key</div><div class="flex items-center gap-2"><span class="font-mono text-sm px-3 py-2 rounded-lg flex-1 truncate" style="background:var(--surface);border:1px solid var(--border);color:#4ade80">{{ cfg.api_key[:24] if cfg.api_key else '-- no keys --' }}…</span><button onclick="navigator.clipboard.writeText('{{ cfg.api_key }}').then(()=>showToast('Copied!'))" class="btn-ghost" style="font-size:12px;padding:8px 12px;flex-shrink:0">Copy</button><a href="/console/api-keys" class="btn-ghost" style="font-size:12px;padding:8px 12px;flex-shrink:0">Manage →</a></div></div>
+    <div>
+      <div class="text-xs font-medium mb-1.5" style="color:var(--muted)">API Key (for native API)</div>
+      <div class="flex items-center gap-2">
+        <span class="font-mono text-sm px-3 py-2 rounded-lg flex-1 truncate" style="background:var(--surface);border:1px solid var(--border);color:#4ade80">{{ cfg.api_key[:24] if cfg.api_key else '— no keys yet —' }}…</span>
+        <button onclick="navigator.clipboard.writeText('{{ cfg.api_key }}').then(()=>showToast('Copied!'))"
+                class="btn-ghost" style="font-size:12px;padding:8px 12px;flex-shrink:0">Copy</button>
+        <a href="/console/api-keys" class="btn-ghost" style="font-size:12px;padding:8px 12px;flex-shrink:0">Manage →</a>
+      </div>
+    </div>
   </div>
+
+  <!-- SMTP config -->
   <div class="card p-6 mb-6">
-    <div class="flex items-center justify-between mb-4"><h2 class="font-semibold text-white">SMTP Delivery</h2>{% if cfg.smtp_configured %}<span class="badge badge-live">✓ Connected</span>{% else %}<span class="badge badge-sandbox">Not configured · sandbox</span>{% endif %}</div>
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-white">SMTP Delivery</h2>
+      {% if cfg.smtp_configured %}
+      <span class="badge badge-live">✓ Connected</span>
+      {% else %}
+      <span class="badge badge-sandbox">Not configured · sandbox mode</span>
+      {% endif %}
+    </div>
+
     {% if not cfg.smtp_configured %}
-    <div class="p-4 rounded-lg mb-5" style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2)"><div class="text-sm" style="color:#fbbf24">📦 Sandbox mode — sends are logged only. Add SMTP credentials to deliver real SMS.</div></div>
+    <div class="p-4 rounded-lg mb-5" style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2)">
+      <div class="text-sm" style="color:#fbbf24">
+        📦 Sandbox mode active — SMS sends are logged to console, not delivered. Set SMTP credentials to enable real delivery.
+      </div>
+    </div>
+    {% else %}
+    <div class="text-sm mb-4" style="color:#94a3b8">
+      Sending via <span class="font-mono" style="color:#e2e8f0">{{ cfg.smtp_host }}</span> as <span class="font-mono" style="color:#e2e8f0">{{ cfg.smtp_user }}</span>
+    </div>
     {% endif %}
-    <div class="code-block text-xs mb-5" style="color:#94a3b8">SMTP_HOST=smtp.gmail.com<br>SMTP_PORT=587<br>SMTP_USER=<span style="color:#fbbf24">yourmail@gmail.com</span><br>SMTP_PASSWORD=<span style="color:#fbbf24">your-app-password</span></div>
+
+    <div class="text-sm font-medium mb-2" style="color:var(--muted)">Add to <span class="font-mono">.env</span>:</div>
+    <div class="code-block text-xs mb-5" style="color:#94a3b8">
+      <span style="color:#64748b"># Gmail (recommended — 500/day free)</span><br>
+      SMTP_HOST=smtp.gmail.com<br>
+      SMTP_PORT=587<br>
+      SMTP_USER=<span style="color:#fbbf24">yourmail@gmail.com</span><br>
+      SMTP_PASSWORD=<span style="color:#fbbf24">your-app-password</span><br>
+      <br>
+      <span style="color:#64748b"># Brevo — 300/day free</span><br>
+      <span style="color:#374151"># SMTP_HOST=smtp-relay.brevo.com</span>
+    </div>
+
     <div class="grid grid-cols-3 gap-3">
-      <a href="https://myaccount.google.com/apppasswords" target="_blank" class="p-3 rounded-lg text-center" style="background:var(--surface);border:1px solid var(--border);text-decoration:none"><div class="font-semibold text-sm text-white">Gmail</div><div class="text-xs mt-1" style="color:var(--muted)">500/day · App Password</div><div class="text-xs mt-1" style="color:#818cf8">→ apppasswords</div></a>
-      <a href="https://app.brevo.com/settings/keys/smtp" target="_blank" class="p-3 rounded-lg text-center" style="background:var(--surface);border:1px solid var(--border);text-decoration:none"><div class="font-semibold text-sm text-white">Brevo</div><div class="text-xs mt-1" style="color:var(--muted)">300/day · SMTP key</div></a>
-      <a href="https://resend.com/api-keys" target="_blank" class="p-3 rounded-lg text-center" style="background:var(--surface);border:1px solid var(--border);text-decoration:none"><div class="font-semibold text-sm text-white">Resend</div><div class="text-xs mt-1" style="color:var(--muted)">100/day · API key</div></a>
+      <a href="https://myaccount.google.com/apppasswords" target="_blank"
+         class="p-3 rounded-lg text-center" style="background:var(--surface);border:1px solid var(--border);text-decoration:none">
+        <div class="font-semibold text-sm text-white">Gmail</div>
+        <div class="text-xs mt-1" style="color:var(--muted)">500/day · App Password</div>
+        <div class="text-xs mt-1" style="color:#818cf8">→ apppasswords</div>
+      </a>
+      <a href="https://app.brevo.com/settings/keys/smtp" target="_blank"
+         class="p-3 rounded-lg text-center" style="background:var(--surface);border:1px solid var(--border);text-decoration:none">
+        <div class="font-semibold text-sm text-white">Brevo</div>
+        <div class="text-xs mt-1" style="color:var(--muted)">300/day · SMTP key</div>
+        <div class="text-xs mt-1" style="color:#818cf8">→ brevo.com</div>
+      </a>
+      <a href="https://resend.com/api-keys" target="_blank"
+         class="p-3 rounded-lg text-center" style="background:var(--surface);border:1px solid var(--border);text-decoration:none">
+        <div class="font-semibold text-sm text-white">Resend</div>
+        <div class="text-xs mt-1" style="color:var(--muted)">100/day · API key</div>
+        <div class="text-xs mt-1" style="color:#818cf8">→ resend.com</div>
+      </a>
     </div>
   </div>
+
+  <!-- Google Voice setup guide -->
+  <div class="card p-6 mb-6" id="google-voice-guide">
+    <div class="flex items-center gap-3 mb-5">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+           style="background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.2)">
+        <svg class="w-5 h-5" style="color:#34d399" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+        </svg>
+      </div>
+      <div>
+        <h2 class="font-semibold text-white">Get a Free Phone Number with Google Voice</h2>
+        <p class="text-xs mt-0.5" style="color:var(--muted)">
+          A real US number — free forever. Takes 2 minutes to set up.
+        </p>
+      </div>
+      <a href="https://voice.google.com" target="_blank"
+         class="ml-auto text-xs font-medium px-3 py-1.5 rounded-lg flex-shrink-0"
+         style="background:rgba(52,211,153,.12);color:#34d399;border:1px solid rgba(52,211,153,.2);text-decoration:none">
+        Open Google Voice →
+      </a>
+    </div>
+
+    <!-- Steps -->
+    <div class="space-y-3 mb-6">
+      <div class="flex gap-3 p-3 rounded-lg" style="background:var(--surface);border:1px solid var(--border)">
+        <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+             style="background:rgba(99,102,241,.2);color:#818cf8">1</div>
+        <div>
+          <div class="text-sm font-medium text-white">Go to voice.google.com</div>
+          <div class="text-xs mt-0.5" style="color:var(--muted)">Sign in with any Google account. Click <strong style="color:#e2e8f0">Get started</strong>.</div>
+        </div>
+      </div>
+
+      <div class="flex gap-3 p-3 rounded-lg" style="background:var(--surface);border:1px solid var(--border)">
+        <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+             style="background:rgba(99,102,241,.2);color:#818cf8">2</div>
+        <div>
+          <div class="text-sm font-medium text-white">Pick your number</div>
+          <div class="text-xs mt-0.5" style="color:var(--muted)">Choose any US area code → search → pick a number you like. Yours forever, for free.</div>
+        </div>
+      </div>
+
+      <div class="flex gap-3 p-3 rounded-lg" style="background:var(--surface);border:1px solid var(--border)">
+        <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+             style="background:rgba(99,102,241,.2);color:#818cf8">3</div>
+        <div>
+          <div class="text-sm font-medium text-white">Verify with a real phone (one-time)</div>
+          <div class="text-xs mt-0.5" style="color:var(--muted)">Google asks for a verification number just once. You can use your personal cell. You don't need to keep it linked.</div>
+        </div>
+      </div>
+
+      <div class="flex gap-3 p-3 rounded-lg" style="background:var(--surface);border:1px solid var(--border)">
+        <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+             style="background:rgba(52,211,153,.2);color:#34d399">4</div>
+        <div>
+          <div class="text-sm font-medium text-white">Register it in TextBase</div>
+          <div class="text-xs mt-0.5" style="color:var(--muted)">
+            Go to <a href="/console/numbers" style="color:#818cf8">Phone Numbers</a> → <strong style="color:#e2e8f0">Add Number</strong> →
+            paste your Google Voice number (e.g. <span class="font-mono" style="color:#e2e8f0">+15551234567</span>) →
+            select <strong style="color:#e2e8f0">Google Voice</strong> as the carrier → Save.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- How delivery works -->
+    <div class="p-4 rounded-lg mb-5" style="background:rgba(99,102,241,.05);border:1px solid rgba(99,102,241,.15)">
+      <div class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:#818cf8">How delivery works</div>
+      <div class="text-sm" style="color:#94a3b8">
+        TextBase emails
+        <span class="font-mono px-1.5 py-0.5 rounded text-xs" style="background:var(--surface);color:#e2e8f0">
+          {recipient's-10-digit-number}@txt.voice.google.com
+        </span>
+        — Google's servers convert it to an SMS and deliver it to that phone. Free, no API key needed, no rate limits beyond your SMTP provider's daily cap.
+      </div>
+    </div>
+
+    <!-- What Google Voice gives you -->
+    <div class="grid grid-cols-3 gap-3 mb-5">
+      <div class="p-3 rounded-lg text-center" style="background:var(--surface);border:1px solid var(--border)">
+        <div class="text-lg font-bold text-white">$0</div>
+        <div class="text-xs mt-1" style="color:#4ade80">Cost forever</div>
+      </div>
+      <div class="p-3 rounded-lg text-center" style="background:var(--surface);border:1px solid var(--border)">
+        <div class="text-lg font-bold text-white">Real US #</div>
+        <div class="text-xs mt-1" style="color:var(--muted)">Full 10-digit number</div>
+      </div>
+      <div class="p-3 rounded-lg text-center" style="background:var(--surface);border:1px solid var(--border)">
+        <div class="text-lg font-bold text-white">2 min</div>
+        <div class="text-xs mt-1" style="color:var(--muted)">Setup time</div>
+      </div>
+    </div>
+
+    <!-- Send test -->
+    <div class="p-4 rounded-lg" style="background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.15)">
+      <div class="text-xs font-semibold uppercase tracking-wider mb-1.5" style="color:#fbbf24">💡 Test it immediately</div>
+      <div class="text-sm" style="color:#94a3b8">
+        Once your number is registered, go to the
+        <a href="/console" style="color:#818cf8">Dashboard</a> → scroll down to <strong style="color:#e2e8f0">Send a Test SMS</strong>
+        → enter your own Google Voice number as the recipient → select <strong style="color:#e2e8f0">Google Voice</strong> → Send.
+        It'll arrive on your phone in seconds.
+      </div>
+    </div>
+  </div>
+
+  <!-- API reference -->
+  <div class="card p-6 mb-6">
+    <h2 class="font-semibold text-white mb-4">API Reference</h2>
+
+    <div class="space-y-5">
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-xs font-bold px-2 py-0.5 rounded" style="background:rgba(34,197,94,.15);color:#4ade80">POST</span>
+          <span class="font-mono text-sm" style="color:#e2e8f0">/api/v1/messages</span>
+          <span class="text-xs" style="color:var(--muted)">— Send SMS</span>
+        </div>
+        <div class="code-block text-xs" style="color:#94a3b8">
+{<br>
+&nbsp;&nbsp;<span style="color:#fbbf24">"to"</span>: <span style="color:#4ade80">"+15551234567"</span>,<br>
+&nbsp;&nbsp;<span style="color:#fbbf24">"carrier"</span>: <span style="color:#4ade80">"verizon"</span>,&nbsp;&nbsp;<span style="color:#374151">// att|verizon|tmobile|sprint|boost|cricket|metro…</span><br>
+&nbsp;&nbsp;<span style="color:#fbbf24">"body"</span>: <span style="color:#4ade80">"Hello!"</span>,<br>
+&nbsp;&nbsp;<span style="color:#fbbf24">"from"</span>: <span style="color:#4ade80">"MyApp"</span>&nbsp;&nbsp;&nbsp;<span style="color:#374151">// optional sender label</span><br>
+}
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-xs font-bold px-2 py-0.5 rounded" style="background:rgba(99,102,241,.15);color:#818cf8">GET</span>
+          <span class="font-mono text-sm" style="color:#e2e8f0">/api/v1/messages</span>
+          <span class="text-xs" style="color:var(--muted)">— List messages</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-xs font-bold px-2 py-0.5 rounded" style="background:rgba(99,102,241,.15);color:#818cf8">GET</span>
+          <span class="font-mono text-sm" style="color:#e2e8f0">/api/v1/messages/{sid}</span>
+          <span class="text-xs" style="color:var(--muted)">— Get message status</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-xs font-bold px-2 py-0.5 rounded" style="background:rgba(34,197,94,.15);color:#4ade80">POST</span>
+          <span class="font-mono text-sm" style="color:#e2e8f0">/2010-04-01/Accounts/{AccountSid}/Messages.json</span>
+          <span class="text-xs" style="color:var(--muted)">— Twilio-compatible</span>
+        </div>
+        <div class="text-xs mt-1" style="color:var(--muted)">
+          Drop-in replacement for existing Twilio code. Pass <span class="font-mono" style="color:#94a3b8">Carrier=verizon</span> as an extra form field for routing.
+          Auth: HTTP Basic with AccountSID:AuthToken.
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-xs font-bold px-2 py-0.5 rounded" style="background:rgba(34,197,94,.15);color:#4ade80">POST</span>
+          <span class="font-mono text-sm" style="color:#e2e8f0">/webhook/inbound</span>
+          <span class="text-xs" style="color:var(--muted)">— Inbound SMS webhook</span>
+        </div>
+        <div class="text-xs mt-1" style="color:var(--muted)">
+          Point your SMS provider's inbound URL here. Accepts From, Body, To fields (Twilio format).
+          <button onclick="navigator.clipboard.writeText(window.location.origin+'/webhook/inbound').then(()=>showToast('Copied!'))"
+                  class="ml-1 font-mono text-xs px-1.5 py-0.5 rounded cursor-pointer"
+                  style="background:rgba(99,102,241,.1);color:#818cf8;border:1px solid rgba(99,102,241,.2)">
+            {{ request.host_url }}webhook/inbound
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Free hosting -->
   <div class="card p-6">
     <h2 class="font-semibold text-white mb-2">Free Hosting (Forever)</h2>
+    <p class="text-sm mb-4" style="color:var(--muted)">TextBase runs as a standard Python/Flask app — deploy it to any of these free-forever platforms:</p>
     <div class="grid grid-cols-3 gap-3 mb-4">
-      <a href="https://cloud.oracle.com/free" target="_blank" class="p-3 rounded-lg" style="background:var(--surface);border:1px solid var(--border);text-decoration:none;display:block"><div class="font-semibold text-sm text-white">Oracle Cloud Free</div><div class="text-xs mt-1" style="color:#4ade80">4 OCPUs · 24 GB · forever</div></a>
-      <a href="https://fly.io" target="_blank" class="p-3 rounded-lg" style="background:var(--surface);border:1px solid var(--border);text-decoration:none;display:block"><div class="font-semibold text-sm text-white">Fly.io</div><div class="text-xs mt-1" style="color:#4ade80">3 shared VMs · forever</div></a>
-      <a href="https://render.com" target="_blank" class="p-3 rounded-lg" style="background:var(--surface);border:1px solid var(--border);text-decoration:none;display:block"><div class="font-semibold text-sm text-white">Render</div><div class="text-xs mt-1" style="color:#fbbf24">Free (sleeps on idle)</div></a>
+      <a href="https://cloud.oracle.com/free" target="_blank"
+         class="p-3 rounded-lg" style="background:var(--surface);border:1px solid var(--border);text-decoration:none;display:block">
+        <div class="font-semibold text-sm text-white">Oracle Cloud Free</div>
+        <div class="text-xs mt-1" style="color:#4ade80">Best: 4 OCPUs · 24 GB · forever</div>
+      </a>
+      <a href="https://fly.io" target="_blank"
+         class="p-3 rounded-lg" style="background:var(--surface);border:1px solid var(--border);text-decoration:none;display:block">
+        <div class="font-semibold text-sm text-white">Fly.io</div>
+        <div class="text-xs mt-1" style="color:#4ade80">3 shared VMs · forever</div>
+      </a>
+      <a href="https://render.com" target="_blank"
+         class="p-3 rounded-lg" style="background:var(--surface);border:1px solid var(--border);text-decoration:none;display:block">
+        <div class="font-semibold text-sm text-white">Render</div>
+        <div class="text-xs mt-1" style="color:#fbbf24">Free tier (sleeps on idle)</div>
+      </a>
     </div>
-    <div class="code-block text-xs" style="color:#94a3b8">gunicorn app:app --bind 0.0.0.0:$PORT</div>
+    <div class="code-block text-xs" style="color:#94a3b8">
+      <span style="color:#64748b"># Deploy command (after setting env vars)</span><br>
+      gunicorn app:app --bind 0.0.0.0:$PORT
+    </div>
   </div>
+
 </div>
 {% endblock %}
