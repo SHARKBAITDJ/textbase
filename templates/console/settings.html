@@ -107,7 +107,7 @@
       <div>
         <h2 class="font-semibold text-white">Get a Free Phone Number with Google Voice</h2>
         <p class="text-xs mt-0.5" style="color:var(--muted)">
-          A real US number — free forever. Takes 2 minutes to set up.
+          A real US number — free forever. Use it as your TextBase "from" number.
         </p>
       </div>
       <a href="https://voice.google.com" target="_blank"
@@ -115,6 +115,25 @@
          style="background:rgba(52,211,153,.12);color:#34d399;border:1px solid rgba(52,211,153,.2);text-decoration:none">
         Open Google Voice →
       </a>
+    </div>
+
+    <!-- Important distinction -->
+    <div class="p-4 rounded-lg mb-5" style="background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.2)">
+      <div class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:#818cf8">How Google Voice fits in</div>
+      <div class="text-sm mb-3" style="color:#94a3b8">
+        Google Voice is a VoIP service — it gives you a free US number but it's <strong style="color:#e2e8f0">not a cellular carrier</strong>, so it has no email-to-SMS gateway.
+        Here's the correct mental model:
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="p-3 rounded-lg" style="background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15)">
+          <div class="text-xs font-semibold mb-1" style="color:#34d399">✓ Google Voice IS</div>
+          <div class="text-xs" style="color:#94a3b8">Your <strong style="color:#e2e8f0">FROM number</strong> — the identity that appears to recipients. Register it under Phone Numbers.</div>
+        </div>
+        <div class="p-3 rounded-lg" style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.15)">
+          <div class="text-xs font-semibold mb-1" style="color:#f87171">✗ Google Voice is NOT</div>
+          <div class="text-xs" style="color:#94a3b8">A delivery carrier. When sending SMS you always select the <strong style="color:#e2e8f0">recipient's real carrier</strong> (AT&amp;T, Verizon, T-Mobile, etc.).</div>
+        </div>
+      </div>
     </div>
 
     <!-- Steps -->
@@ -133,7 +152,7 @@
              style="background:rgba(99,102,241,.2);color:#818cf8">2</div>
         <div>
           <div class="text-sm font-medium text-white">Pick your number</div>
-          <div class="text-xs mt-0.5" style="color:var(--muted)">Choose any US area code → search → pick a number you like. Yours forever, for free.</div>
+          <div class="text-xs mt-0.5" style="color:var(--muted)">Choose any US area code → search → pick a number you like. Free forever.</div>
         </div>
       </div>
 
@@ -141,8 +160,8 @@
         <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
              style="background:rgba(99,102,241,.2);color:#818cf8">3</div>
         <div>
-          <div class="text-sm font-medium text-white">Verify with a real phone (one-time)</div>
-          <div class="text-xs mt-0.5" style="color:var(--muted)">Google asks for a verification number just once. You can use your personal cell. You don't need to keep it linked.</div>
+          <div class="text-sm font-medium text-white">Verify once with your real phone</div>
+          <div class="text-xs mt-0.5" style="color:var(--muted)">Google asks for a verification number just once. Use your personal cell — you don't need to keep it linked.</div>
         </div>
       </div>
 
@@ -150,30 +169,31 @@
         <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
              style="background:rgba(52,211,153,.2);color:#34d399">4</div>
         <div>
-          <div class="text-sm font-medium text-white">Register it in TextBase</div>
+          <div class="text-sm font-medium text-white">Register it in TextBase as your FROM number</div>
           <div class="text-xs mt-0.5" style="color:var(--muted)">
             Go to <a href="/console/numbers" style="color:#818cf8">Phone Numbers</a> → <strong style="color:#e2e8f0">Add Number</strong> →
             paste your Google Voice number (e.g. <span class="font-mono" style="color:#e2e8f0">+15551234567</span>) →
-            select <strong style="color:#e2e8f0">Google Voice</strong> as the carrier → Save.
+            leave the carrier field blank or pick your personal phone's carrier (for inbound routing) → Save.
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-3 p-3 rounded-lg" style="background:var(--surface);border:1px solid var(--border)">
+        <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+             style="background:rgba(52,211,153,.2);color:#34d399">5</div>
+        <div>
+          <div class="text-sm font-medium text-white">Send your first SMS</div>
+          <div class="text-xs mt-0.5" style="color:var(--muted)">
+            Go to the <a href="/console" style="color:#818cf8">Dashboard</a> test sender →
+            enter a real recipient number (your own cell is fine) →
+            <strong style="color:#e2e8f0">select that recipient's carrier</strong> (AT&amp;T, Verizon, T-Mobile, etc.) → Send.
           </div>
         </div>
       </div>
     </div>
 
-    <!-- How delivery works -->
-    <div class="p-4 rounded-lg mb-5" style="background:rgba(99,102,241,.05);border:1px solid rgba(99,102,241,.15)">
-      <div class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:#818cf8">How delivery works</div>
-      <div class="text-sm" style="color:#94a3b8">
-        TextBase emails
-        <span class="font-mono px-1.5 py-0.5 rounded text-xs" style="background:var(--surface);color:#e2e8f0">
-          {recipient's-10-digit-number}@txt.voice.google.com
-        </span>
-        — Google's servers convert it to an SMS and deliver it to that phone. Free, no API key needed, no rate limits beyond your SMTP provider's daily cap.
-      </div>
-    </div>
-
     <!-- What Google Voice gives you -->
-    <div class="grid grid-cols-3 gap-3 mb-5">
+    <div class="grid grid-cols-3 gap-3">
       <div class="p-3 rounded-lg text-center" style="background:var(--surface);border:1px solid var(--border)">
         <div class="text-lg font-bold text-white">$0</div>
         <div class="text-xs mt-1" style="color:#4ade80">Cost forever</div>
@@ -185,17 +205,6 @@
       <div class="p-3 rounded-lg text-center" style="background:var(--surface);border:1px solid var(--border)">
         <div class="text-lg font-bold text-white">2 min</div>
         <div class="text-xs mt-1" style="color:var(--muted)">Setup time</div>
-      </div>
-    </div>
-
-    <!-- Send test -->
-    <div class="p-4 rounded-lg" style="background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.15)">
-      <div class="text-xs font-semibold uppercase tracking-wider mb-1.5" style="color:#fbbf24">💡 Test it immediately</div>
-      <div class="text-sm" style="color:#94a3b8">
-        Once your number is registered, go to the
-        <a href="/console" style="color:#818cf8">Dashboard</a> → scroll down to <strong style="color:#e2e8f0">Send a Test SMS</strong>
-        → enter your own Google Voice number as the recipient → select <strong style="color:#e2e8f0">Google Voice</strong> → Send.
-        It'll arrive on your phone in seconds.
       </div>
     </div>
   </div>

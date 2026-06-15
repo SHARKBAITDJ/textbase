@@ -48,7 +48,6 @@ CARRIER_GATEWAYS = {
     'uscellular':   ('US Cellular',        'email.uscc.net'),
     'virgin':       ('Virgin Mobile',      'vmobl.com'),
     'mint':         ('Mint Mobile',        'tmomail.net'),
-    'google_voice': ('Google Voice',       'txt.voice.google.com'),   # ← free dedicated number
     'google_fi':    ('Google Fi',          'msg.fi.google.com'),
     'consumer':     ('Consumer Cellular',  'mailmymobile.net'),
     'tracfone':     ('Tracfone',           'mmst5.tracfone.com'),
